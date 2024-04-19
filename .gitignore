@@ -128,3 +128,13 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# custom
+.DS_Store
+artifacts/
+cache/
+forge-cache/
+out/
+broadcast/
+.openzeppelin/
+.gas-snapshot

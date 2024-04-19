@@ -1,0 +1,32 @@
+{
+  "name": "tab-protocol",
+  "version": "1.0.0",
+  "description": "A decentralised stablecoin protocol anchored to Bitcoin.",
+  "main": "index.js",
+  "scripts": {
+    "test": "forge test -vvv"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shiftctrl-money/tab-protocol.git"
+  },
+  "keywords": [
+    "ShiftCTRL"
+  ],
+  "author": "tomjeffo",
+  "license": "MIT",
+  "devDependencies": {
+    "@openzeppelin/contracts": "^4.9.2",
+    "@openzeppelin/contracts-upgradeable": "^4.9.3",
+    "@openzeppelin/hardhat-upgrades": "^2.2.1",
+    "ethers": "^6.6.5"
+  },
+  "dependencies": {
+    "forge-std": "github:foundry-rs/forge-std#v1.6.0",
+    "solady": "^0.0.124"
+  },
+  "bugs": {
+    "url": "https://github.com/shiftctrl-money/tab-protocol/issues"
+  },
+  "homepage": "https://www.shiftctrl.money"
+}
