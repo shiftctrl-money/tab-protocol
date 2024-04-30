@@ -11,7 +11,7 @@ interface IReserveRegistry {
 
     function reserveAddrSafe(address) external view returns (address);
 
-    function enabledReserve(bytes32) external returns (bool);
+    function enabledReserve(bytes32) external view returns (bool);
 
     function isEnabledReserve(address) external view returns (bool);
 

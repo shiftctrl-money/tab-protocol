@@ -138,7 +138,7 @@ abstract contract Deployer {
 
         // VaultManager
         bytes memory vaultManagerInitData =
-            abi.encodeWithSignature("initialize(address,address,address)", owner, owner, owner);
+            abi.encodeWithSignature("initialize(address,address,address,address)", owner, owner, owner, owner);
         VaultManager vaultManagerImpl = new VaultManager(); // implementation
         vaultManagerAddr = address(
             new TransparentUpgradeableProxy(address(vaultManagerImpl), address(tabProxyAdmin), vaultManagerInitData)
@@ -146,7 +146,7 @@ abstract contract Deployer {
         vaultManager = VaultManager(vaultManagerAddr);
 
         // TabRegistry
-        tabRegistry = new TabRegistry(owner, owner, owner, owner, address(vaultManager), address(tabProxyAdmin));
+        tabRegistry = new TabRegistry(owner, owner, owner, owner, owner, address(vaultManager), address(tabProxyAdmin));
 
         tabFactory = new TabFactory(owner, address(tabRegistry));
         tabRegistry.setTabFactory(address(tabFactory));
@@ -158,14 +158,15 @@ abstract contract Deployer {
         bytes32 res_cBTC = keccak256("CBTC");
 
         // ReserveRegistry
-        reserveRegistry = new ReserveRegistry(owner, owner, owner);
+        reserveRegistry = new ReserveRegistry(owner, owner, owner, owner);
 
         // ReserveSafe
-        reserveSafe = new ReserveSafe(owner, address(vaultManager), address(cBTC));
+        reserveSafe = new ReserveSafe(owner, owner, address(vaultManager), address(cBTC));
         reserveRegistry.addReserve(res_cBTC, address(cBTC), address(reserveSafe));
 
         // Governance Action
-        bytes memory governanceActionInitData = abi.encodeWithSignature("initialize(address,address)", owner, owner);
+        bytes memory governanceActionInitData =
+            abi.encodeWithSignature("initialize(address,address,address)", owner, owner, owner);
         GovernanceAction governanceActionImpl = new GovernanceAction(); // implementation
         governanceActionAddr = address(
             new TransparentUpgradeableProxy(
@@ -176,12 +177,15 @@ abstract contract Deployer {
 
         // Config
         address treasuryAddr = 0x7045CC042c0571F671236db73ba93BD1B82b2326;
-        config = new Config(owner, governanceActionAddr, owner, treasuryAddr, address(tabRegistry), auctionManagerAddr);
+        config = new Config(
+            owner, owner, governanceActionAddr, owner, treasuryAddr, address(tabRegistry), auctionManagerAddr
+        );
         tabRegistry.setConfigAddress(address(config));
 
         // PriceOracle
         bytes memory priceOracleManagerInitData = abi.encodeWithSignature(
-            "initialize(address,address,address,address,address)",
+            "initialize(address,address,address,address,address,address)",
+            owner,
             owner,
             governanceActionAddr,
             owner,
@@ -195,7 +199,7 @@ abstract contract Deployer {
             )
         );
 
-        priceOracle = new PriceOracle(owner, address(vaultManager), priceOracleManagerAddr, address(tabRegistry));
+        priceOracle = new PriceOracle(owner, owner, address(vaultManager), priceOracleManagerAddr, address(tabRegistry));
 
         IPriceOracleManager(priceOracleManagerAddr).setPriceOracle(address(priceOracle));
 
@@ -217,7 +221,8 @@ abstract contract Deployer {
 
         // oracle & keeper
         bytes memory vaultKeeperInitData = abi.encodeWithSignature(
-            "initialize(address,address,address,address,address)",
+            "initialize(address,address,address,address,address,address)",
+            owner,
             owner,
             owner,
             owner,

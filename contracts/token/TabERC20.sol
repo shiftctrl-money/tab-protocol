@@ -47,7 +47,7 @@ contract TabERC20 is
     function tabCode() external view returns (bytes3) {
         bytes memory e = abi.encodePacked(symbol());
         bytes memory r = new bytes(3);
-        r[0] = e[1];
+        r[0] = e[1]; // ignored first character(index 0) 's'
         r[1] = e[2];
         r[2] = e[3];
         return bytes3(r);

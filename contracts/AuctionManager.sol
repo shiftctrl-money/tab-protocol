@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 contract AuctionManager is AccessControlDefaultAdminRules, ReentrancyGuard {
 
-    uint256 public constant MAX_STEP = 9; // actual size = 10, index 9 reserved for min. liquidation price
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
     address public vaultManagerAddr;
@@ -52,6 +51,7 @@ contract AuctionManager is AccessControlDefaultAdminRules, ReentrancyGuard {
 
     uint256 public auctionCount;
     uint256[] public auctionVaultIds;
+    uint256 public maxStep;
 
     event UpdatedVaultManager(address oldAddr, address newAddr);
     event ActiveAuction(
@@ -65,8 +65,8 @@ contract AuctionManager is AccessControlDefaultAdminRules, ReentrancyGuard {
     event SuccessfulBid(uint256 indexed auctionId, address indexed bidder, uint256 bidPrice, uint256 bidQty);
 
     /**
-     * @param _admin governance contract
-     * @param _admin2 governanceAction
+     * @param _admin governance
+     * @param _admin2 emergency governance
      * @param _vaultManager vault manager contract
      */
     constructor(
@@ -82,11 +82,17 @@ contract AuctionManager is AccessControlDefaultAdminRules, ReentrancyGuard {
 
         vaultManagerAddr = _vaultManager;
         auctionCount = 0;
+        maxStep = 9; // actual size = 10 with index 9 reserved for min. liquidation price
     }
 
     function setVaultManager(address _vaultManager) external onlyRole(MANAGER_ROLE) {
         emit UpdatedVaultManager(vaultManagerAddr, _vaultManager);
         vaultManagerAddr = _vaultManager;
+    }
+
+    function setMaxStep(uint256 _maxStep) external onlyRole(MANAGER_ROLE) {
+        require(_maxStep > 0, "INVALID_STEP");
+        maxStep = _maxStep;
     }
 
     function createAuction(
@@ -261,7 +267,7 @@ contract AuctionManager is AccessControlDefaultAdminRules, ReentrancyGuard {
             return auctionSteps;
         }
 
-        auctionSteps = new AuctionStep[](MAX_STEP + 1);
+        auctionSteps = new AuctionStep[](maxStep + 1);
         uint256 step = 1;
         uint256 stepTime = 0;
         if (state.auctionPrice == det.startPrice) {
@@ -277,7 +283,7 @@ contract AuctionManager is AccessControlDefaultAdminRules, ReentrancyGuard {
             stepTime = stepTime + det.auctionStepDurationInSec;
             auctionSteps[step] = AuctionStep(stepTime, auctionPrice);
             step++;
-            if (step == MAX_STEP) {
+            if (step == maxStep) {
                 break;
             }
         }

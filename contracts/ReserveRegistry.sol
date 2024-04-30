@@ -19,12 +19,21 @@ contract ReserveRegistry is AccessControlDefaultAdminRules {
 
     /**
      * @param _admin governance
-     * @param _admin2 governance action
+     * @param _admin2 emergency governance
+     * @param _governanceAction governance action
      * @param _deployer deployment
      */
-    constructor(address _admin, address _admin2, address _deployer) AccessControlDefaultAdminRules(1 days, _admin) {
+    constructor(
+        address _admin,
+        address _admin2,
+        address _governanceAction,
+        address _deployer
+    )
+        AccessControlDefaultAdminRules(1 days, _admin)
+    {
         _grantRole(MAINTAINER_ROLE, _admin);
         _grantRole(MAINTAINER_ROLE, _admin2);
+        _grantRole(MAINTAINER_ROLE, _governanceAction);
         _grantRole(MAINTAINER_ROLE, _deployer);
     }
 

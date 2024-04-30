@@ -92,6 +92,7 @@ contract VaultKeeper is Initializable, AccessControlDefaultAdminRulesUpgradeable
 
     function initialize(
         address _admin,
+        address _admin2,
         address _deployer,
         address _authorizedRelayer,
         address _vaultManager,
@@ -104,12 +105,15 @@ contract VaultKeeper is Initializable, AccessControlDefaultAdminRulesUpgradeable
         __UUPSUpgradeable_init();
 
         _grantRole(EXECUTOR_ROLE, _admin);
+        _grantRole(EXECUTOR_ROLE, _admin2);
         _grantRole(EXECUTOR_ROLE, _authorizedRelayer);
         _grantRole(EXECUTOR_ROLE, _vaultManager);
         _grantRole(MAINTAINER_ROLE, _admin);
+        _grantRole(MAINTAINER_ROLE, _admin2);
         _grantRole(MAINTAINER_ROLE, _authorizedRelayer);
         _grantRole(MAINTAINER_ROLE, _config);
         _grantRole(DEPLOYER_ROLE, _admin);
+        _grantRole(DEPLOYER_ROLE, _admin2);
         _grantRole(DEPLOYER_ROLE, _deployer);
         vaultManager = _vaultManager;
         riskPenaltyFrameInSecond = 24 hours; // 86400 = 60 * 60 * 24
@@ -132,7 +136,10 @@ contract VaultKeeper is Initializable, AccessControlDefaultAdminRulesUpgradeable
         external
         onlyRole(MAINTAINER_ROLE)
     {
-        require(_reserveKey.length == _minReserveRatio.length && _reserveKey.length == _liquidationRatio.length, "INVALID_LENGTH");
+        require(
+            _reserveKey.length == _minReserveRatio.length && _reserveKey.length == _liquidationRatio.length,
+            "INVALID_LENGTH"
+        );
         for (uint256 i = 0; i < _reserveKey.length; i = unsafe_inc(i)) {
             require(_minReserveRatio[i] > 100, "INVALID_MIN_RESERVE_RATIO");
             require(_liquidationRatio[i] > 100, "INVALID_LIQUIDATION_RATIO");
@@ -256,8 +263,7 @@ contract VaultKeeper is Initializable, AccessControlDefaultAdminRulesUpgradeable
         }
     }
 
-    /// @dev Relayer calls this whenever risk penalty tracking frame is expired to update all cached risk penalty into
-    /// vault(s)
+    /// @dev Called when risk penalty tracking frame is expired. To update all cached risk penalty into vault(s).
     function pushAllVaultRiskPenalty(uint256 _timestamp) public onlyRole(EXECUTOR_ROLE) {
         _pushAllVaultRiskPenalty(_timestamp, 0);
     }

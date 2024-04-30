@@ -36,18 +36,31 @@ contract TabRegistryTest is Test {
 
     function setUp() public {
         tabRegistry = new TabRegistry(
-            address(this), address(this), address(this), address(this), dummyVaultManager, dummyTabProxyAdmin
+            address(this),
+            address(this),
+            address(this),
+            address(this),
+            address(this),
+            dummyVaultManager,
+            dummyTabProxyAdmin
         );
         tabFactory = new TabFactory(address(this), address(tabRegistry));
         tabRegistry.setTabFactory(address(tabFactory));
 
         config = new Config(
-            address(this), address(this), address(this), address(this), address(tabRegistry), dummyAuctionManager
+            address(this),
+            address(this),
+            address(this),
+            address(this),
+            address(this),
+            address(tabRegistry),
+            dummyAuctionManager
         );
 
         tabProxyAdmin = new TabProxyAdmin(address(this));
         bytes memory initData = abi.encodeWithSignature(
-            "initialize(address,address,address,address,address)",
+            "initialize(address,address,address,address,address,address)",
+            address(this),
             address(this),
             address(this),
             address(this),
@@ -58,14 +71,17 @@ contract TabRegistryTest is Test {
         address priceOracleManagerProxy =
             address(new TransparentUpgradeableProxy(address(priceOracleManager), address(tabProxyAdmin), initData));
 
-        priceOracle = new PriceOracle(address(this), dummyVaultManager, priceOracleManagerProxy, address(tabRegistry));
+        priceOracle = new PriceOracle(
+            address(this), address(this), dummyVaultManager, priceOracleManagerProxy, address(tabRegistry)
+        );
         PriceOracleManager(priceOracleManagerProxy).setPriceOracle(address(priceOracle));
 
         tabRegistry.setConfigAddress(address(config));
         tabRegistry.setPriceOracleManagerAddress(priceOracleManagerProxy);
 
         bytes memory vaultKeeperInitData = abi.encodeWithSignature(
-            "initialize(address,address,address,address,address)",
+            "initialize(address,address,address,address,address,address)",
+            address(this),
             address(this),
             address(this),
             address(this),
@@ -79,7 +95,7 @@ contract TabRegistryTest is Test {
         config.setVaultKeeperAddress(vaultKeeperAddr);
 
         bytes memory governanceActionInitData =
-            abi.encodeWithSignature("initialize(address,address)", address(this), address(this));
+            abi.encodeWithSignature("initialize(address,address,address)", address(this), address(this), address(this));
         GovernanceAction governanceActionImpl = new GovernanceAction(); // implementation
         governanceAction = GovernanceAction(
             address(
@@ -210,7 +226,9 @@ contract TabRegistryTest is Test {
 
     function testCreateTabWithInvalidAddress() public {
         vm.expectRevert();
-        new TabRegistry(address(0), address(0), address(0), address(0), dummyVaultManager, dummyTabProxyAdmin);
+        new TabRegistry(
+            address(0), address(0), address(0), address(0), address(0), dummyVaultManager, dummyTabProxyAdmin
+        );
     }
 
     function testTabListOrder() public {

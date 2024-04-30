@@ -3,11 +3,9 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
-// import "lib/solady/src/utils/FixedPointMathLib.sol";
 
 import "./Deployer.t.sol";
 import { IGovernor } from "@openzeppelin/contracts/governance/IGovernor.sol";
-// import {GovernorCountingSimple} from "@openzeppelin/contracts/governance/extensions/GovernorCountingSimple.sol";
 import { DssVestMintable } from "../../contracts/DssVest.sol";
 
 contract GovernanceTest is Test, Deployer {
@@ -38,10 +36,10 @@ contract GovernanceTest is Test, Deployer {
      *  value 10 represents quorum being 10% of total supply
      */
     function testShiftCtrlGovernorConfig() public {
-        assertEq(shiftCtrlGovernor.votingDelay(), 300);
-        assertEq(shiftCtrlGovernor.votingPeriod(), 50400);
-        assertEq(shiftCtrlGovernor.proposalThreshold(), 100e18);
-        assertEq(shiftCtrlGovernor.quorumNumerator(), 10);
+        assertEq(shiftCtrlGovernor.votingDelay(), 2 days);
+        assertEq(shiftCtrlGovernor.votingPeriod(), 3 days);
+        assertEq(shiftCtrlGovernor.proposalThreshold(), 10000e18);
+        assertEq(shiftCtrlGovernor.quorumNumerator(), 5);
         assertEq(shiftCtrlGovernor.quorumDenominator(), 100);
 
         vm.expectRevert("Governor: onlyGovernance");
@@ -86,7 +84,7 @@ contract GovernanceTest is Test, Deployer {
 
         console.log("Proposed #", id);
         assert(shiftCtrlGovernor.state(id) == IGovernor.ProposalState.Pending);
-        nextBlock(301);
+        nextBlock(2 days + 1);
         assert(shiftCtrlGovernor.state(id) == IGovernor.ProposalState.Active);
 
         // GovernorCountingSimple
@@ -98,10 +96,10 @@ contract GovernanceTest is Test, Deployer {
         shiftCtrlGovernor.castVote(id, 1); // GovernorCountingSimple.VoteType.For
         vm.stopPrank();
 
-        assertEq(shiftCtrlGovernor.quorum(current), 1000e18); // minted 10000, required 10%
+        assertEq(shiftCtrlGovernor.quorum(current), 500e18); // 5% of 10k
         assertEq(shiftCtrlGovernor.getVotes(eoa_accounts[3], current), 10000e18);
 
-        nextBlock(50401); // forward 50400++
+        nextBlock(3 days);
         assert(shiftCtrlGovernor.state(id) == IGovernor.ProposalState.Succeeded);
 
         shiftCtrlGovernor.queue(targets, values, calldatas, description);
@@ -128,9 +126,9 @@ contract GovernanceTest is Test, Deployer {
      */
     function testShiftCtrlEmergencyGovernorConfig() public {
         assertEq(shiftCtrlEmergencyGovernor.votingDelay(), 0);
-        assertEq(shiftCtrlEmergencyGovernor.votingPeriod(), 300);
-        assertEq(shiftCtrlEmergencyGovernor.proposalThreshold(), 1000e18);
-        assertEq(shiftCtrlEmergencyGovernor.quorumNumerator(), 51);
+        assertEq(shiftCtrlEmergencyGovernor.votingPeriod(), 30 minutes);
+        assertEq(shiftCtrlEmergencyGovernor.proposalThreshold(), 1000000e18);
+        assertEq(shiftCtrlEmergencyGovernor.quorumNumerator(), 5);
         assertEq(shiftCtrlEmergencyGovernor.quorumDenominator(), 100);
 
         vm.expectRevert("Governor: onlyGovernance");
@@ -145,7 +143,7 @@ contract GovernanceTest is Test, Deployer {
         vm.expectRevert("Governor: onlyGovernance");
         shiftCtrlEmergencyGovernor.updateQuorumNumerator(1);
 
-        ctrl.mint(eoa_accounts[3], 10000e18);
+        ctrl.mint(eoa_accounts[3], 1000000e18);
 
         vm.startPrank(eoa_accounts[3]);
 
@@ -174,9 +172,9 @@ contract GovernanceTest is Test, Deployer {
         uint256 id = shiftCtrlEmergencyGovernor.propose(targets, values, calldatas, "test");
         nextBlock(1);
         console.log("Proposed #", id);
-        assert(shiftCtrlEmergencyGovernor.state(id) == IGovernor.ProposalState.Active); // No Pending state on emergency
-            // governor
-        nextBlock(150); // 30 minutes
+        // No Pending state on emergency governor, due to 0 proposal delay
+        assert(shiftCtrlEmergencyGovernor.state(id) == IGovernor.ProposalState.Active);
+        nextBlock(20 minutes); // within 30 minutes voting period, remained Active
         assert(shiftCtrlEmergencyGovernor.state(id) == IGovernor.ProposalState.Active);
 
         // GovernorCountingSimple
@@ -188,10 +186,10 @@ contract GovernanceTest is Test, Deployer {
         shiftCtrlEmergencyGovernor.castVote(id, 1); // GovernorCountingSimple.VoteType.For
         vm.stopPrank();
 
-        assertEq(shiftCtrlEmergencyGovernor.quorum(current), 5100e18); // minted 10000, required 51%
-        assertEq(shiftCtrlEmergencyGovernor.getVotes(eoa_accounts[3], current), 10000e18);
+        assertEq(shiftCtrlEmergencyGovernor.quorum(current), 50000e18); // 5% of 1M
+        assertEq(shiftCtrlEmergencyGovernor.getVotes(eoa_accounts[3], current), 1000000e18);
 
-        nextBlock(150); // another 30 minutes, reached 1 hour voting period
+        nextBlock(10 minutes + 1); // passed 30 minutes voting period
         assert(shiftCtrlEmergencyGovernor.state(id) == IGovernor.ProposalState.Succeeded);
 
         shiftCtrlEmergencyGovernor.queue(targets, values, calldatas, description);
@@ -208,7 +206,7 @@ contract GovernanceTest is Test, Deployer {
     }
 
     function testUpdateDelay() public {
-        ctrl.mint(eoa_accounts[3], 10000e18);
+        ctrl.mint(eoa_accounts[3], 1000000e18); // 1M
         assertEq(timelockController.getMinDelay(), 0);
 
         vm.startPrank(eoa_accounts[3]);
@@ -229,15 +227,14 @@ contract GovernanceTest is Test, Deployer {
         uint256 id = shiftCtrlEmergencyGovernor.propose(targets, values, calldatas, "update delay");
         nextBlock(1);
         console.log("Update delay Proposed #", id);
-        assert(shiftCtrlEmergencyGovernor.state(id) == IGovernor.ProposalState.Active); // No Pending state on emergency
-            // governor
+        assert(shiftCtrlEmergencyGovernor.state(id) == IGovernor.ProposalState.Active);
         shiftCtrlEmergencyGovernor.castVote(id, 1); // GovernorCountingSimple.VoteType.For
 
         vm.stopPrank();
 
-        assertEq(shiftCtrlEmergencyGovernor.quorum(current), 5100e18); // minted 10000, required 51%
-        assertEq(shiftCtrlEmergencyGovernor.getVotes(eoa_accounts[3], current), 10000e18);
-        nextBlock(300);
+        assertEq(shiftCtrlEmergencyGovernor.quorum(current), 5e22);
+        assertEq(shiftCtrlEmergencyGovernor.getVotes(eoa_accounts[3], current), 1000000e18);
+        nextBlock(30 minutes); // passed voting period
         shiftCtrlEmergencyGovernor.queue(targets, values, calldatas, description);
         id = shiftCtrlEmergencyGovernor.execute(targets, values, calldatas, description);
         assert(shiftCtrlEmergencyGovernor.state(id) == IGovernor.ProposalState.Executed);
@@ -256,9 +253,9 @@ contract GovernanceTest is Test, Deployer {
         shiftCtrlEmergencyGovernor.castVote(id, 1); // GovernorCountingSimple.VoteType.For
         vm.stopPrank();
 
-        nextBlock(300);
+        nextBlock(30 minutes); // passed voting period
         shiftCtrlEmergencyGovernor.queue(targets, values, calldatas, description);
-        vm.expectRevert("TimelockController: operation is not ready");
+        vm.expectRevert("TimelockController: operation is not ready"); // exec delay 100
         id = shiftCtrlEmergencyGovernor.execute(targets, values, calldatas, description);
         assertEq(timelockController.getMinDelay(), 100);
 
@@ -278,7 +275,7 @@ contract GovernanceTest is Test, Deployer {
         );
         nextBlock(10000);
 
-        ctrl.mint(eoa_accounts[3], 1000e18); // total supply 1000 as of now
+        ctrl.mint(eoa_accounts[3], 1000000e18); // total supply 1M as of now
 
         vm.startPrank(eoa_accounts[3]);
 
@@ -311,10 +308,10 @@ contract GovernanceTest is Test, Deployer {
         shiftCtrlEmergencyGovernor.castVote(id, 0); // 0: Against
         vm.stopPrank();
 
-        assertEq(shiftCtrlEmergencyGovernor.quorum(current), 510e18); // based on snapshot 1k supply, quorum is 510
-        assertEq(shiftCtrlEmergencyGovernor.getVotes(eoa_accounts[3], current), 1000e18);
+        assertEq(shiftCtrlEmergencyGovernor.quorum(current), 50000e18); // 5% of 1M
+        assertEq(shiftCtrlEmergencyGovernor.getVotes(eoa_accounts[3], current), 1000000e18);
         assertEq(shiftCtrlEmergencyGovernor.getVotes(eoa_accounts[1], current), 0);
-        nextBlock(300);
+        nextBlock(30 minutes);
         shiftCtrlEmergencyGovernor.queue(targets, values, calldatas, description);
         id = shiftCtrlEmergencyGovernor.execute(targets, values, calldatas, description);
         assert(shiftCtrlEmergencyGovernor.state(id) == IGovernor.ProposalState.Executed);

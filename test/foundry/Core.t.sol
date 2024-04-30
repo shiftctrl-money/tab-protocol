@@ -195,14 +195,8 @@ contract CoreTest is Test, Deployer {
         assertEq(vaultManager.vaultId(), 1);
         assertEq(vaultManager.getAllVaultIDByOwner(eoa_accounts[0])[0], 1);
 
-        (
-            address reserveAddr,
-            uint256 reserveAmt,
-            address tab,
-            uint256 tabAmt,
-            uint256 osTabAmt,
-            uint256 pendingOsMint
-        ) = vaultManager.vaults(eoa_accounts[0], 1);
+        (address reserveAddr, uint256 reserveAmt, address tab, uint256 tabAmt, uint256 osTabAmt, uint256 pendingOsMint)
+        = vaultManager.vaults(eoa_accounts[0], 1);
         assertEq(reserveAddr, address(cBTC));
         assertEq(reserveAmt, 1e18);
         assertEq(tab, sUSDAddr);

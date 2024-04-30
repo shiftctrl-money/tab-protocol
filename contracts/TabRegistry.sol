@@ -6,7 +6,6 @@ import { IPriceOracle } from "./oracle/interfaces/IPriceOracle.sol";
 import { IConfig } from "./shared/interfaces/IConfig.sol";
 import { ITabFactory } from "./shared/interfaces/ITabFactory.sol";
 import { IVaultManager } from "./shared/interfaces/IVaultManager.sol";
-// import {RDA} from "./auction/RDA.sol";
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/access/AccessControlDefaultAdminRules.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -64,6 +63,7 @@ contract TabRegistry is AccessControlDefaultAdminRules {
     constructor(
         address _admin,
         address _admin2,
+        address _governanceAction,
         address _deployer,
         address _authorizedRelayer,
         address _vaultManager,
@@ -73,15 +73,19 @@ contract TabRegistry is AccessControlDefaultAdminRules {
     {
         _grantRole(USER_ROLE, _admin); // createTab: governance voted to create custom tab (with oracle price)
         _grantRole(USER_ROLE, _admin2);
+        _grantRole(USER_ROLE, _governanceAction);
         _grantRole(USER_ROLE, _vaultManager);
         _grantRole(MAINTAINER_ROLE, _admin);
         _grantRole(MAINTAINER_ROLE, _admin2);
+        _grantRole(MAINTAINER_ROLE, _governanceAction);
         _grantRole(MAINTAINER_ROLE, _deployer);
         _grantRole(TAB_PAUSER_ROLE, _admin);
         _grantRole(TAB_PAUSER_ROLE, _admin2);
+        _grantRole(TAB_PAUSER_ROLE, _governanceAction);
         _grantRole(TAB_PAUSER_ROLE, _authorizedRelayer);
         _grantRole(ALL_TAB_PAUSER_ROLE, _admin);
         _grantRole(ALL_TAB_PAUSER_ROLE, _admin2);
+        _grantRole(ALL_TAB_PAUSER_ROLE, _governanceAction);
         _setRoleAdmin(MAINTAINER_ROLE, MAINTAINER_ROLE);
         _setRoleAdmin(USER_ROLE, MAINTAINER_ROLE);
         _setRoleAdmin(TAB_PAUSER_ROLE, MAINTAINER_ROLE);

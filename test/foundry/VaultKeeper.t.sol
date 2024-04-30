@@ -285,7 +285,8 @@ contract VaultKeeperTest is Test, Deployer {
         (,,,, osTab, reserveValue, minReserveValue) = vaultManager.getVaultDetails(eoa_accounts[0], vaultIDs[0]);
         checkVaultData = abi.encodeWithSignature(
             "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256))",
-            block.timestamp, // 1703839837 + 1 + 106 = 1703839944, 1703839944 - 1703839837 = 107 / 10 = 10, 10 * 10 = 100,
+            block.timestamp, // 1703839837 + 1 + 106 = 1703839944, 1703839944 - 1703839837 = 107 / 10 = 10, 10 * 10 =
+                // 100,
                 // 1703839837 + 100 = 1703839937
             eoa_accounts[0],
             vaultIDs[0],
@@ -349,7 +350,8 @@ contract VaultKeeperTest is Test, Deployer {
         vaultIDs = vaultManager.getAllVaultIDByOwner(eoa_accounts[0]);
         assertEq(vaultIDs[0], 1);
 
-        vaultManager.createVault(reserve_cBTC, 1e18, 0x4d5952, 97001910184158850789691); // mint 97001.910184158850789691
+        vaultManager.createVault(reserve_cBTC, 1e18, 0x4d5952, 97001910184158850789691); // mint
+            // 97001.910184158850789691
             // sMYR
         vaultIDs = new uint256[](0);
         vaultIDs = vaultManager.getAllVaultIDByOwner(eoa_accounts[0]);

@@ -14,7 +14,7 @@ contract ReserveSafeTest is Test {
 
     function setUp() public {
         mockReserve = new MockERC20();
-        reserveSafe = new ReserveSafe(dummyAdmin, dummyManager, address(mockReserve));
+        reserveSafe = new ReserveSafe(dummyAdmin, dummyAdmin, dummyManager, address(mockReserve));
     }
 
     function testUnlockReserve() public {

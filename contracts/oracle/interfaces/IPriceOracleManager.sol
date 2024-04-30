@@ -13,15 +13,21 @@ interface IPriceOracleManager {
 
     function lastUpdated(bytes3 _tab) external view returns (uint256);
 
+    function movementDelta() external view returns(uint256);
+
+    function inactivePeriod() external view returns(uint256);
+
+    function defBlockGenerationTimeInSecond() external view returns(uint256);
+
     function addNewTab(bytes3 _tab) external;
 
     function setDefBlockGenerationTimeInSecond(uint256 _secondPerBlock) external;
 
     function providers(address) external view returns (uint256, uint256, uint256, uint256, uint256, bool);
 
-    function providerInfo(address) external view returns (address, uint256, uint256, uint256, bytes32);
-
     function providerTracker(address) external view returns (uint256, uint256, uint256, uint256, uint256);
+    
+    function providerInfo(address) external view returns (address, uint256, uint256, uint256, bytes32);
 
     function providerList(uint256) external view returns (address);
 

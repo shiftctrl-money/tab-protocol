@@ -39,6 +39,8 @@ interface IAuctionManager {
 
     function setVaultManager(address) external;
 
+    function setMaxStep(uint256) external;
+
     function createAuction(
         uint256 vaultId,
         address reserve,

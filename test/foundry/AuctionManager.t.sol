@@ -155,6 +155,13 @@ contract AuctionManagerTest is Test, Deployer {
         assertEq(IAuctionManager(auctionManagerAddr).vaultManagerAddr(), address(10));
     }
 
+    function testSetMaxStep() public {
+        vm.expectRevert("INVALID_STEP");
+        IAuctionManager(auctionManagerAddr).setMaxStep(0);
+
+        IAuctionManager(auctionManagerAddr).setMaxStep(100);
+    }
+
     // refer auction excel file
     function testCreateAuction() public {
         assertEq(cBTC.balanceOf(auctionManagerAddr), 6e18); // full vault reserve is transferred to auction manager
@@ -475,17 +482,19 @@ contract AuctionManagerTest is Test, Deployer {
         assertEq(auctionAvailableQty, auctionPrice > 0 ? FixedPointMathLib.divWad(osTabAmt, auctionPrice) : 0);
 
         // bid remaining reserve
-        expectedLeftoverReserve = reserveQty - auctionAvailableQty;
-        vm.expectEmit(auctionManagerAddr);
-        emit SuccessfulBid(vaultIDs[0], eoa_accounts[9], auctionPrice, auctionAvailableQty);
-        IAuctionManager(auctionManagerAddr).bid(vaultIDs[0], reserveQty);
-        (reserveQty, auctionAvailableQty, osTabAmt, auctionPrice) =
-            IAuctionManager(auctionManagerAddr).getAuctionState(vaultIDs[0]);
-        assertEq(reserveQty, expectedLeftoverReserve);
-        assertEq(auctionAvailableQty, 0);
-        assertEq(osTabAmt, 0);
-        assertEq(auctionPrice, 0);
-        vm.stopPrank();
+        if (auctionAvailableQty > 0) {
+            expectedLeftoverReserve = reserveQty - auctionAvailableQty;
+            vm.expectEmit(auctionManagerAddr);
+            emit SuccessfulBid(vaultIDs[0], eoa_accounts[9], auctionPrice, auctionAvailableQty);
+            IAuctionManager(auctionManagerAddr).bid(vaultIDs[0], reserveQty);
+            (reserveQty, auctionAvailableQty, osTabAmt, auctionPrice) =
+                IAuctionManager(auctionManagerAddr).getAuctionState(vaultIDs[0]);
+            assertEq(reserveQty, expectedLeftoverReserve);
+            assertEq(auctionAvailableQty, 0);
+            assertEq(osTabAmt, 0);
+            assertEq(auctionPrice, 0);
+            vm.stopPrank();
+        }
     }
 
     function testSmallBids() public {

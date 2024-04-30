@@ -9,8 +9,8 @@ import "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFractio
 import "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol";
 
 /**
- * @dev Voting delay = 0 day, Voting period = 1 hour, 1 block = 12 seconds, Proposal threshold = 1000
- * Quorum = 51%, Token decimal = 18, Updatable setings = yes, Votes = ERC20Votes,
+ * @dev Voting delay = 0, Voting period = 30 minutes, Proposal threshold = 1,000,000
+ * Quorum = 5%, Token decimal = 18, Updatable setings = yes, Votes = ERC20Votes,
  * Timelock = TimelockController , 0 timelock delay
  */
 contract ShiftCtrlEmergencyGovernor is
@@ -22,18 +22,17 @@ contract ShiftCtrlEmergencyGovernor is
     GovernorTimelockControl
 {
 
+    /// @dev 1M CTRL to propose, 0 propose delay, 30 minutes voting period, 5% quorum
     constructor(
         IVotes _token,
         TimelockController _timelock
     )
         Governor("ShiftCtrlEmergencyGovernor")
-        GovernorSettings(0, /* 0 day */ 300, /* 1 hour */ 1000e18)
+        GovernorSettings(0, 30 minutes, 1000000e18)
         GovernorVotes(_token)
-        GovernorVotesQuorumFraction(51)
+        GovernorVotesQuorumFraction(5)
         GovernorTimelockControl(_timelock)
     { }
-
-    // The following functions are overrides required by Solidity.
 
     function votingDelay() public view override(IGovernor, GovernorSettings) returns (uint256) {
         return super.votingDelay();

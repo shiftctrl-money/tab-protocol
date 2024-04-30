@@ -163,7 +163,7 @@ contract ProtocolVaultTest is Test, Deployer {
         wbtc1Addr =
             address(new TransparentUpgradeableProxy(ctrlBTCImplementation, address(cBTCProxyAdmin), ctrlBtcInitData));
         wBTC1 = CBTC(wbtc1Addr);
-        btc1Safe = new ReserveSafe(owner, address(vaultManager), wbtc1Addr);
+        btc1Safe = new ReserveSafe(owner, owner, address(vaultManager), wbtc1Addr);
         reserveRegistry.addReserve(reserve_WBTC1, wbtc1Addr, address(btc1Safe));
 
         bytes32 reserve_WBTC2 = keccak256("WBTC2");
@@ -171,7 +171,7 @@ contract ProtocolVaultTest is Test, Deployer {
         wbtc2Addr =
             address(new TransparentUpgradeableProxy(ctrlBTCImplementation, address(cBTCProxyAdmin), ctrlBtcInitData));
         wBTC2 = CBTC(wbtc2Addr);
-        btc2Safe = new ReserveSafe(owner, address(vaultManager), wbtc2Addr);
+        btc2Safe = new ReserveSafe(owner, owner, address(vaultManager), wbtc2Addr);
         reserveRegistry.addReserve(reserve_WBTC2, wbtc2Addr, address(btc2Safe));
 
         bytes32[] memory reserveKey = new bytes32[](2);

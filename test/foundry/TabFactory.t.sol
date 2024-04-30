@@ -20,7 +20,7 @@ contract TabFactoryTest is Test {
     function setUp() public {
         owner = address(this);
         rs = new RateSimulator();
-        tabRegistry = new TabRegistry(owner, owner, owner, owner, owner, owner);
+        tabRegistry = new TabRegistry(owner, owner, owner, owner, owner, owner, owner);
         tabFactory = new TabFactory(owner, address(tabRegistry));
         console.log("Deployed TabRegistry: ", address(tabRegistry));
         console.log("Deployed TabFactory: ", address(tabFactory));
