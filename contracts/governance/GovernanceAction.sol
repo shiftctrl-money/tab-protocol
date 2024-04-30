@@ -15,13 +15,14 @@ contract GovernanceAction is Initializable, AccessControlDefaultAdminRulesUpgrad
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant MAINTAINER_ROLE = keccak256("MAINTAINER_ROLE");
 
+    address emergencyGovernanceController;
     address configAddress;
     address tabRegistryAddress;
     address reserveRegistryAddress;
     address priceOracleManagerAddress;
 
     struct OracleProvider {
-        uint256 activatedSinceBlockId;
+        uint256 activatedSinceBlockNum;
         uint256 activatedTimestamp;
         uint256 disabledOnBlockId;
         uint256 disabledTimestamp;
@@ -69,7 +70,8 @@ contract GovernanceAction is Initializable, AccessControlDefaultAdminRulesUpgrad
         address paymentTokenAddress,
         uint256 paymentAmtPerFeed,
         uint256 blockCountPerFeed,
-        uint256 feedSize
+        uint256 feedSize,
+        bytes32 whitelistedIPAddr
     );
     event RemovedPriceOracleProvider(address indexed _provider, uint256 blockNum, uint256 timestamp);
     event PausedPriceOracleProvider(address indexed _provider);
@@ -83,16 +85,16 @@ contract GovernanceAction is Initializable, AccessControlDefaultAdminRulesUpgrad
         _disableInitializers();
     }
 
-    function initialize(address _admin, address _admin2) public initializer {
-        __AccessControlDefaultAdminRules_init(1 days, _admin);
+    function initialize(address _governance, address _emergencyGovernance, address _deployer) public initializer {
+        __AccessControlDefaultAdminRules_init(1 days, _governance);
         __UUPSUpgradeable_init();
-        _grantRole(MAINTAINER_ROLE, _admin);
-        _grantRole(MAINTAINER_ROLE, _admin2);
+        _grantRole(MAINTAINER_ROLE, _governance);
+        _grantRole(MAINTAINER_ROLE, _emergencyGovernance);
+        _grantRole(MAINTAINER_ROLE, _deployer);
+        emergencyGovernanceController = _emergencyGovernance;
         defBlockGenerationTimeInSecond = 12;
     }
 
-    // Refer UUPSUpgradeable:
-    // The {_authorizeUpgrade} function must be overridden to include access restriction to the upgrade mechanism.
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) { }
 
     function setContractAddress(
@@ -217,8 +219,15 @@ contract GovernanceAction is Initializable, AccessControlDefaultAdminRulesUpgrad
 
     // Reserve
 
-    function addReserve(bytes32 _reserveKey, address _token, address _vaultManager) external onlyRole(MAINTAINER_ROLE) {
-        ReserveSafe reserveSafe = new ReserveSafe(owner(), _vaultManager, _token);
+    function addReserve(
+        bytes32 _reserveKey,
+        address _token,
+        address _vaultManager
+    )
+        external
+        onlyRole(MAINTAINER_ROLE)
+    {
+        ReserveSafe reserveSafe = new ReserveSafe(owner(), emergencyGovernanceController, _vaultManager, _token);
         IReserveRegistry(reserveRegistryAddress).addReserve(_reserveKey, _token, address(reserveSafe));
         emit AddedReserve(_reserveKey, _token, address(reserveSafe));
     }
@@ -253,7 +262,7 @@ contract GovernanceAction is Initializable, AccessControlDefaultAdminRulesUpgrad
         onlyRole(MAINTAINER_ROLE)
     {
         require(provider != address(0), "INVALID_PROVIDER");
-        require(providers[provider].activatedSinceBlockId == 0, "EXISTED_PROVIDER");
+        require(providers[provider].activatedSinceBlockNum == 0, "EXISTED_PROVIDER");
         require(paymentTokenAddress != address(0), "INVALID_PAYMENT_TOKEN_ADDR");
         require(paymentAmtPerFeed > 0, "ZERO_PAYMENT_AMT");
         require(blockCountPerFeed > 0, "ZERO_BLOCK_COUNT_PER_FEED");
@@ -295,23 +304,17 @@ contract GovernanceAction is Initializable, AccessControlDefaultAdminRulesUpgrad
         onlyRole(MAINTAINER_ROLE)
     {
         require(
-            providers[provider].activatedTimestamp > 0 && providers[provider].disabledOnBlockId == 0,
-            "INVALID_PROVIDER"
+            providers[provider].activatedTimestamp > 0 && providers[provider].disabledOnBlockId == 0, "INVALID_PROVIDER"
         );
         require(paymentTokenAddress != address(0), "INVALID_PAYMENT_TOKEN_ADDR");
         require(blockCountPerFeed > 0, "ZERO_BLOCK_COUNT_PER_FEED");
         require(feedSize > 0, "ZERO_FEED_SIZE");
 
         IPriceOracleManager(priceOracleManagerAddress).configureProvider(
-            provider,
-            paymentTokenAddress,
-            paymentAmtPerFeed,
-            blockCountPerFeed,
-            feedSize,
-            whitelistedIPAddr
+            provider, paymentTokenAddress, paymentAmtPerFeed, blockCountPerFeed, feedSize, whitelistedIPAddr
         );
         emit ConfigPriceOracleProvider(
-            provider, paymentTokenAddress, paymentAmtPerFeed, blockCountPerFeed, feedSize
+            provider, paymentTokenAddress, paymentAmtPerFeed, blockCountPerFeed, feedSize, whitelistedIPAddr
         );
     }
 
@@ -326,7 +329,7 @@ contract GovernanceAction is Initializable, AccessControlDefaultAdminRulesUpgrad
         require(_provider != address(0), "INVALID_ADDR");
         require(_blockNumber > 0, "ZERO_BLOCK_NUMBER");
         require(_timestamp > 0, "ZERO_TIMESTAMP");
-        require(providers[_provider].activatedSinceBlockId > 0, "NOT_FOUND");
+        require(providers[_provider].activatedSinceBlockNum > 0, "NOT_FOUND");
 
         providers[_provider].disabledOnBlockId = _blockNumber;
         providers[_provider].disabledTimestamp = _timestamp;

@@ -45,7 +45,7 @@ contract PriceOracleManagerTest is Test, Deployer {
 
     struct OracleProvider {
         uint256 index;
-        uint256 activatedSinceBlockId;
+        uint256 activatedSinceBlockNum;
         uint256 activatedTimestamp;
         uint256 disabledOnBlockId;
         uint256 disabledTimestamp;
@@ -190,22 +190,22 @@ contract PriceOracleManagerTest is Test, Deployer {
         assertEq(priceOracleManager.providerList(2), eoa_accounts[9]);
 
         uint256 index;
-        uint256 activatedSinceBlockId;
+        uint256 activatedSinceBlockNum;
         uint256 activatedTimestamp;
 
-        (index, activatedSinceBlockId, activatedTimestamp,,,) = priceOracleManager.providers(eoa_accounts[7]);
+        (index, activatedSinceBlockNum, activatedTimestamp,,,) = priceOracleManager.providers(eoa_accounts[7]);
         assertEq(index, 0);
-        assertEq(activatedSinceBlockId, 2);
+        assertEq(activatedSinceBlockNum, 2);
         assertEq(activatedTimestamp, 2);
 
-        (index, activatedSinceBlockId, activatedTimestamp,,,) = priceOracleManager.providers(eoa_accounts[8]);
+        (index, activatedSinceBlockNum, activatedTimestamp,,,) = priceOracleManager.providers(eoa_accounts[8]);
         assertEq(index, 1);
-        assertEq(activatedSinceBlockId, 3);
+        assertEq(activatedSinceBlockNum, 3);
         assertEq(activatedTimestamp, 3);
 
-        (index, activatedSinceBlockId, activatedTimestamp,,,) = priceOracleManager.providers(eoa_accounts[9]);
+        (index, activatedSinceBlockNum, activatedTimestamp,,,) = priceOracleManager.providers(eoa_accounts[9]);
         assertEq(index, 2);
-        assertEq(activatedSinceBlockId, 4);
+        assertEq(activatedSinceBlockNum, 4);
         assertEq(activatedTimestamp, 4);
 
         uint256 govActivatedSinceBlockId;
@@ -286,14 +286,10 @@ contract PriceOracleManagerTest is Test, Deployer {
     function testConfigureProvider() public {
         vm.startPrank(eoa_accounts[5]);
         vm.expectRevert();
-        governanceAction.configurePriceOracleProvider(
-            eoa_accounts[7], address(this), 999, 1, 1, "123.222.444.555"
-        );
+        governanceAction.configurePriceOracleProvider(eoa_accounts[7], address(this), 999, 1, 1, "123.222.444.555");
         vm.stopPrank();
 
-        governanceAction.configurePriceOracleProvider(
-            eoa_accounts[7], address(this), 999, 10, 99, "123.222.444.555"
-        );
+        governanceAction.configurePriceOracleProvider(eoa_accounts[7], address(this), 999, 10, 99, "123.222.444.555");
 
         address paymentTokenAddress;
         uint256 paymentAmtPerFeed;
@@ -389,7 +385,7 @@ contract PriceOracleManagerTest is Test, Deployer {
 
         nextBlock(1);
         vm.expectRevert(); // already disabled
-        governanceAction.removePriceOracleProvider(eoa_accounts[8], block.number + 10, block.timestamp + 10); 
+        governanceAction.removePriceOracleProvider(eoa_accounts[8], block.number + 10, block.timestamp + 10);
     }
 
     function testWithdrawPayment() public {
@@ -497,7 +493,8 @@ contract PriceOracleManagerTest is Test, Deployer {
         (t.lastUpdatedTimestamp, t.lastUpdatedBlockId, t.lastPaymentBlockId, t.osPayment, t.feedMissCount) =
             priceOracleManager.providerTracker(eoa_accounts[7]);
         assertEq(t.lastUpdatedTimestamp, paymentTimestamp);
-        assertEq(t.feedMissCount, 11 + (60 * 60 * 12 / 25) - 1 + 2 + (60 * 60 * 12 / 25) - 2); // 1738 + 2(60/25=2.4) + 1728 - 2 = 3466
+        assertEq(t.feedMissCount, 11 + (60 * 60 * 12 / 25) - 1 + 2 + (60 * 60 * 12 / 25) - 2); // 1738 + 2(60/25=2.4) +
+            // 1728 - 2 = 3466
         assertEq(t.osPayment, 2e18);
         console.log("preparing to give up payment...");
 
@@ -591,9 +588,7 @@ contract PriceOracleManagerTest is Test, Deployer {
     function testUpdatePrice_missedFeed() public {
         nextBlock(1);
 
-        governanceAction.configurePriceOracleProvider(
-            eoa_accounts[7], address(ctrl), 1e18, 25, 10, "123.222.444.555"
-        );
+        governanceAction.configurePriceOracleProvider(eoa_accounts[7], address(ctrl), 1e18, 25, 10, "123.222.444.555");
 
         updatePriceData = abi.encodeWithSignature(
             "updatePrice((bytes3,uint256,uint256,uint256[9])[10],(bytes32,bytes32))", tabPools, cidParts

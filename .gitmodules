@@ -1,5 +1,5 @@
-[submodule "your_project/lib/forge-std"]
-	path = your_project/lib/forge-std
+[submodule "lib/forge-std"]
+	path = lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
 [submodule "lib/solady"]
 	path = lib/solady
@@ -7,6 +7,3 @@
 [submodule "lib/forge-deploy"]
 	path = lib/forge-deploy
 	url = https://github.com/wighawag/forge-deploy
-[submodule "lib/forge-std"]
-	path = lib/forge-std
-	url = https://github.com/foundry-rs/forge-std

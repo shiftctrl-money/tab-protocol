@@ -2,19 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/AccessControlDefaultAdminRules.sol";
-
-interface VaultKeeperInterface {
-
-    function setReserveParams(
-        bytes32[] calldata _reserveKey,
-        uint256[] calldata _minReserveRatio,
-        uint256[] calldata _liquidationRatio
-    )
-        external;
-
-    function setTabParams(bytes3[] calldata _tabs, uint256[] calldata _riskPenaltyPerFrameList) external;
-
-}
+import "./shared/interfaces/IVaultKeeper.sol";
 
 contract Config is AccessControlDefaultAdminRules {
 
@@ -39,7 +27,7 @@ contract Config is AccessControlDefaultAdminRules {
         address auctionManager;
     }
 
-    address public treasury;
+    address public treasury; // storing risk penalty charged on vaults
     address public vaultKeeper;
     address public tabRegistry;
     AuctionParams public auctionParams;
@@ -62,6 +50,7 @@ contract Config is AccessControlDefaultAdminRules {
     constructor(
         address _admin,
         address _admin2,
+        address _governanceAction,
         address _deployer,
         address _treasury,
         address _tabRegistry,
@@ -71,6 +60,7 @@ contract Config is AccessControlDefaultAdminRules {
     {
         _grantRole(MAINTAINER_ROLE, _admin);
         _grantRole(MAINTAINER_ROLE, _admin2);
+        _grantRole(MAINTAINER_ROLE, _governanceAction);
         _grantRole(MAINTAINER_ROLE, _deployer);
         _grantRole(MAINTAINER_ROLE, _tabRegistry);
         treasury = _treasury;
@@ -114,21 +104,18 @@ contract Config is AccessControlDefaultAdminRules {
             reserveParams[_reserveKey[i]].liquidationRatio = _liquidationRatio[i];
         }
         emit UpdatedReserveParams(_reserveKey, _processFeeRate, _minReserveRatio, _liquidationRatio);
-        VaultKeeperInterface(vaultKeeper).setReserveParams(_reserveKey, _minReserveRatio, _liquidationRatio);
+        IVaultKeeper(vaultKeeper).setReserveParams(_reserveKey, _minReserveRatio, _liquidationRatio);
     }
 
     function setDefTabParams(bytes3 _tab) external onlyRole(MAINTAINER_ROLE) {
-        require(
-            tabParams[_tab].riskPenaltyPerFrame == 0 && tabParams[_tab].processFeeRate == 0,
-            "EXISTED_TAB_PARAMS"
-        );
+        require(tabParams[_tab].riskPenaltyPerFrame == 0 && tabParams[_tab].processFeeRate == 0, "EXISTED_TAB_PARAMS");
         tabParams[_tab] = TabParams(tabParams[0x00].riskPenaltyPerFrame, tabParams[0x00].processFeeRate);
 
         bytes3[] memory tabList = new bytes3[](1);
         tabList[0] = _tab;
         uint256[] memory riskPenaltyPerFrameList = new uint256[](1);
         riskPenaltyPerFrameList[0] = tabParams[0x00].riskPenaltyPerFrame;
-        VaultKeeperInterface(vaultKeeper).setTabParams(tabList, riskPenaltyPerFrameList);
+        IVaultKeeper(vaultKeeper).setTabParams(tabList, riskPenaltyPerFrameList);
 
         emit DefaultTabParams(_tab, tabParams[0x00].riskPenaltyPerFrame, tabParams[0x00].processFeeRate);
     }
@@ -141,10 +128,7 @@ contract Config is AccessControlDefaultAdminRules {
         external
         onlyRole(MAINTAINER_ROLE)
     {
-        require(
-            _tab.length == _riskPenaltyPerFrame.length && _tab.length == _processFeeRate.length,
-            "INVALID_LENGTH"
-        );
+        require(_tab.length == _riskPenaltyPerFrame.length && _tab.length == _processFeeRate.length, "INVALID_LENGTH");
         for (uint256 i = 0; i < _tab.length; i = unsafe_inc(i)) {
             require(_riskPenaltyPerFrame[i] > 0, "INVALID_RP_PER_FRAME");
 
@@ -152,7 +136,7 @@ contract Config is AccessControlDefaultAdminRules {
             tabParams[_tab[i]].processFeeRate = _processFeeRate[i];
         }
         emit UpdatedTabParams(_tab, _riskPenaltyPerFrame, _processFeeRate);
-        VaultKeeperInterface(vaultKeeper).setTabParams(_tab, _riskPenaltyPerFrame);
+        IVaultKeeper(vaultKeeper).setTabParams(_tab, _riskPenaltyPerFrame);
     }
 
     function setAuctionParams(

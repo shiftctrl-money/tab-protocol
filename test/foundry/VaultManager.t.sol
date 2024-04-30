@@ -29,14 +29,15 @@ contract VaultManagerTest is Test {
         mockReserve = new MockERC20();
         mockReserve.mint(owner, INITIAL_BALANCE);
 
-        reserveRegistry = new ReserveRegistry(owner, owner, owner);
+        reserveRegistry = new ReserveRegistry(owner, owner, owner, owner);
         bytes32 dummyReserveKey = bytes32(0x1200000000000000000000000000000000000000000000000000000000000001);
         reserveRegistry.addReserve(dummyReserveKey, address(mockReserve), address(0)); // Assuming no safe is
 
         TabProxyAdmin tabProxyAdmin = new TabProxyAdmin(address(this));
 
-        bytes memory vaultManagerInitData =
-            abi.encodeWithSignature("initialize(address,address,address)", dummyAdmin, dummyDeployer, dummyUI);
+        bytes memory vaultManagerInitData = abi.encodeWithSignature(
+            "initialize(address,address,address,address)", dummyAdmin, dummyAdmin, dummyDeployer, dummyUI
+        );
         VaultManager vaultManagerImpl = new VaultManager(); // implementation
         address vaultManagerAddr = address(
             new TransparentUpgradeableProxy(address(vaultManagerImpl), address(tabProxyAdmin), vaultManagerInitData)

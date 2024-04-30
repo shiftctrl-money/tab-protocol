@@ -15,8 +15,17 @@ contract ReserveSafe is AccessControlDefaultAdminRules {
     event ApprovedSpender(address indexed spender, uint256 value);
 
     /// @dev Create new ReserveSafe contract to store new type of reserve (e.g. WBTC, cBTC)
-    constructor(address _admin, address _manager, address _reserveAddr) AccessControlDefaultAdminRules(1 days, _admin) {
-        _grantRole(UNLOCKER_ROLE, _manager);
+    constructor(
+        address _admin,
+        address _admin2,
+        address _vaultManager,
+        address _reserveAddr
+    )
+        AccessControlDefaultAdminRules(1 days, _admin)
+    {
+        _grantRole(UNLOCKER_ROLE, _admin);
+        _grantRole(UNLOCKER_ROLE, _admin2);
+        _grantRole(UNLOCKER_ROLE, _vaultManager);
         reserveInterface = IERC20(_reserveAddr);
     }
 

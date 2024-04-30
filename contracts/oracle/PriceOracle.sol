@@ -30,16 +30,22 @@ contract PriceOracle is IPriceOracle, Pausable, AccessControlDefaultAdminRules {
 
     constructor(
         address _admin,
+        address _admin2,
         address _vaultManager,
         address _priceOracleManager,
         address _tabRegistry
     )
         AccessControlDefaultAdminRules(1 days, _admin)
     {
-        _grantRole(FEEDER_ROLE, _admin); // governance may step in to update price if really needed
+        _grantRole(FEEDER_ROLE, _admin);
+        _grantRole(FEEDER_ROLE, _admin2);
         _grantRole(FEEDER_ROLE, _priceOracleManager);
+
         _grantRole(PAUSER_ROLE, _admin);
+        _grantRole(PAUSER_ROLE, _admin2);
+
         _grantRole(USER_ROLE, _vaultManager);
+
         _grantRole(TAB_REGISTRY_ROLE, _tabRegistry);
         inactivePeriod = 1 hours;
     }

@@ -21,6 +21,18 @@ interface ITabRegistry {
 
     function ctrlAltDelTab(bytes3) external view returns (uint256);
 
+    function setTabFactory(address _tabFactory) external;
+
+    function setVaultManagerAddress(address _vaultManager) external;
+
+    function setConfigAddress(address _config) external;
+
+    function setPriceOracleManagerAddress(address _priceOracleManager) external;
+
+    function setGovernanceAction(address _governanceAction) external;
+
+    function setProtocolVaultAddress(address _protocolVault) external;
+
     function setPeggedTab(bytes3 _ptab, bytes3 _tab, uint256 _priceRatio) external;
 
     function enableTab(bytes3 _tab) external;
@@ -31,17 +43,7 @@ interface ITabRegistry {
 
     function disableAllTab() external;
 
-    function setVaultManagerAddress(address _vaultManager) external;
-
-    function setConfigAddress(address _config) external;
-
-    function setPriceOracleManagerAddress(address _priceOracleManager) external;
-
     function createTab(bytes3 _tab) external returns (address);
-
-    function setGovernanceAction(address _governanceAction) external;
-
-    function setProtocolVaultAddress(address _protocolVault) external;
 
     function getCtrlAltDelTabList() external view returns (bytes3[] memory);
 

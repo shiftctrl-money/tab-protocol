@@ -53,6 +53,7 @@ contract Deploy is Script {
     address shiftCtrlGovernor;
     address shiftCtrlEmergencyGovernor;
     address governanceTimelockController;
+    address emergencyTimelockController;
     address governanceAction;
     address vaultManager;
     address tabRegistry;
@@ -99,7 +100,7 @@ contract Deploy is Script {
         vm.startBroadcast(deployer);
 
         ctrlProxyAdmin = address(new TabProxyAdmin(deployer));
-        ctrl = deployCtrl(deployer, ctrlProxyAdmin); // TODO: review role/permission
+        ctrl = deployCtrl(deployer, ctrlProxyAdmin);
         console.log("CTRL Proxy Admin: ", ctrlProxyAdmin);
         console.log("CTRL: ", ctrl);
 
@@ -107,46 +108,54 @@ contract Deploy is Script {
         console.log("TabProxyAdmin: ", tabProxyAdmin);
 
         address[] memory tempAddrs = new address[](0);
-        TimelockController timelockController = new TimelockController(0, tempAddrs, tempAddrs, deployer);
-        governanceTimelockController = address(timelockController);
+        TimelockController delayedTimelock = new TimelockController(2 days, tempAddrs, tempAddrs, deployer);
+        TimelockController emergencyTimelock = new TimelockController(0, tempAddrs, tempAddrs, deployer);
+        governanceTimelockController = address(delayedTimelock);
+        emergencyTimelockController = address(emergencyTimelock);
         TabProxyAdmin(tabProxyAdmin).transferOwnership(governanceTimelockController);
         
-        ShiftCtrlGovernor governor = new ShiftCtrlGovernor(IVotes(ctrl), timelockController);
+        ShiftCtrlGovernor governor = new ShiftCtrlGovernor(IVotes(ctrl), delayedTimelock);
         shiftCtrlGovernor = address(governor);
-        ShiftCtrlEmergencyGovernor emergencyGovernor = new ShiftCtrlEmergencyGovernor(IVotes(ctrl), timelockController);
+        ShiftCtrlEmergencyGovernor emergencyGovernor = new ShiftCtrlEmergencyGovernor(IVotes(ctrl), delayedTimelock);
         shiftCtrlEmergencyGovernor = address(emergencyGovernor);
         
-        timelockController.grantRole(EXECUTOR_ROLE, shiftCtrlGovernor);
-        timelockController.grantRole(PROPOSER_ROLE, shiftCtrlGovernor);
-        timelockController.grantRole(CANCELLER_ROLE, shiftCtrlGovernor);
-        timelockController.grantRole(TIMELOCK_ADMIN_ROLE, shiftCtrlGovernor);
+        delayedTimelock.grantRole(EXECUTOR_ROLE, shiftCtrlGovernor);
+        delayedTimelock.grantRole(PROPOSER_ROLE, shiftCtrlGovernor);
+        delayedTimelock.grantRole(CANCELLER_ROLE, shiftCtrlGovernor);
+        delayedTimelock.grantRole(TIMELOCK_ADMIN_ROLE, shiftCtrlGovernor);
 
-        timelockController.grantRole(EXECUTOR_ROLE, shiftCtrlEmergencyGovernor);
-        timelockController.grantRole(PROPOSER_ROLE, shiftCtrlEmergencyGovernor);
-        timelockController.grantRole(CANCELLER_ROLE, shiftCtrlEmergencyGovernor);
-        timelockController.grantRole(TIMELOCK_ADMIN_ROLE, shiftCtrlEmergencyGovernor);
+        emergencyTimelock.grantRole(EXECUTOR_ROLE, shiftCtrlEmergencyGovernor);
+        emergencyTimelock.grantRole(PROPOSER_ROLE, shiftCtrlEmergencyGovernor);
+        emergencyTimelock.grantRole(CANCELLER_ROLE, shiftCtrlEmergencyGovernor);
+        emergencyTimelock.grantRole(TIMELOCK_ADMIN_ROLE, shiftCtrlEmergencyGovernor);
 
-        // timelockController.revokeRole(EXECUTOR_ROLE, deployer);
-        // timelockController.revokeRole(PROPOSER_ROLE, deployer);
-        // timelockController.revokeRole(CANCELLER_ROLE, deployer);
-        // timelockController.revokeRole(TIMELOCK_ADMIN_ROLE, deployer);
+        delayedTimelock.revokeRole(EXECUTOR_ROLE, deployer);
+        delayedTimelock.revokeRole(PROPOSER_ROLE, deployer);
+        delayedTimelock.revokeRole(CANCELLER_ROLE, deployer);
+        delayedTimelock.revokeRole(TIMELOCK_ADMIN_ROLE, deployer);
+        
+        emergencyTimelock.revokeRole(EXECUTOR_ROLE, deployer);
+        emergencyTimelock.revokeRole(PROPOSER_ROLE, deployer);
+        emergencyTimelock.revokeRole(CANCELLER_ROLE, deployer);
+        emergencyTimelock.revokeRole(TIMELOCK_ADMIN_ROLE, deployer);
 
-        console.log("TimelockController: ", governanceTimelockController);
+        console.log("GovernanceTimelockController: ", governanceTimelockController);
+        console.log("GovernanceEmergencyTimelockController: ", emergencyTimelockController);
         console.log("ShiftCtrlGovernor: ", shiftCtrlGovernor);
         console.log("ShiftCtrlEmergencyGovernor: ", shiftCtrlEmergencyGovernor);
 
         cBTCProxyAdmin = address(new TabProxyAdmin(deployer));
-        cBTC = deployCBTC(deployer, deployer, deployer, cBTCProxyAdmin); // TODO: review role/permission
+        cBTC = deployCBTC(deployer, deployer, deployer, cBTCProxyAdmin);
         console.log("cBTC Proxy Admin: ", cBTCProxyAdmin);
         console.log("cBTC: ", cBTC);
 
-        governanceAction = deployGovernanceAction(deployer, deployer, tabProxyAdmin);
+        governanceAction = deployGovernanceAction(deployer, deployer, deployer, tabProxyAdmin);
         console.log("GovernanceAction: ", governanceAction);
         
-        vaultManager = deployVaultManager(deployer, deployer, tabProxyAdmin);
+        vaultManager = deployVaultManager(deployer, deployer, deployer, tabProxyAdmin);
         console.log("VaultManager: ", vaultManager);
 
-        tabRegistry = address(new TabRegistry(deployer, deployer, deployer, deployer, vaultManager, tabProxyAdmin));
+        tabRegistry = address(new TabRegistry(deployer, deployer, deployer, deployer, deployer, vaultManager, tabProxyAdmin));
         console.log("TabRegistry: ", tabRegistry);
         TabRegistry(tabRegistry).setGovernanceAction(governanceAction);
 
@@ -157,25 +166,25 @@ contract Deploy is Script {
         auctionManager = address(new AuctionManager(deployer, deployer, vaultManager));
         console.log("AuctionManager: ", auctionManager);
 
-        config = address(new Config(deployer, deployer, deployer, TREASURY, tabRegistry, auctionManager));
+        config = address(new Config(deployer, deployer, deployer, deployer, TREASURY, tabRegistry, auctionManager));
         TabRegistry(tabRegistry).setConfigAddress(config);
         console.log("Config: ", config);
 
-        reserveRegistry = address(new ReserveRegistry(deployer, deployer, deployer));
+        reserveRegistry = address(new ReserveRegistry(deployer, deployer, deployer, deployer));
         console.log("ReserveRegistry: ", reserveRegistry);
 
-        reserveSafe = address(new ReserveSafe(deployer, vaultManager, cBTC));
+        reserveSafe = address(new ReserveSafe(deployer, deployer, vaultManager, cBTC));
         ReserveRegistry(reserveRegistry).addReserve(reserve_cBTC, cBTC, reserveSafe);
         console.log("ReserveSafe: ", reserveSafe);
 
-        priceOracleManager = deployPriceOracleManager(deployer, governanceAction, deployer, tabRegistry, tabProxyAdmin);
+        priceOracleManager = deployPriceOracleManager(deployer, deployer, governanceAction, deployer, tabRegistry, tabProxyAdmin);
         console.log("PriceOracleManager: ", priceOracleManager);
 
-        priceOracle = address(new PriceOracle(deployer, vaultManager, priceOracleManager, tabRegistry));
+        priceOracle = address(new PriceOracle(deployer, deployer, vaultManager, priceOracleManager, tabRegistry));
         console.log("PriceOracle: ", priceOracle);
         PriceOracleManager(priceOracleManager).setPriceOracle(priceOracle);
 
-        vaultKeeper = deployVaultKeeper(deployer, deployer, vaultManager, config, tabProxyAdmin);
+        vaultKeeper = deployVaultKeeper(deployer, deployer, deployer, vaultManager, config, tabProxyAdmin);
         console.log("VaultKeeper: ", vaultKeeper);
 
         VaultManager(vaultManager).configContractAddress(
@@ -225,17 +234,17 @@ contract Deploy is Script {
         );
     }
 
-    function deployGovernanceAction(address _governanceTimelockController, address _deployer, address _tabProxyAdmin) internal returns(address) {
-        bytes memory governanceActionInitData = abi.encodeWithSignature("initialize(address,address)", _governanceTimelockController, _deployer);
+    function deployGovernanceAction(address _governanceTimelockController, address _emergencyTimelockController, address _deployer, address _tabProxyAdmin) internal returns(address) {
+        bytes memory governanceActionInitData = abi.encodeWithSignature("initialize(address,address,address)", _governanceTimelockController, _emergencyTimelockController, _deployer);
         GovernanceAction governanceActionImpl = new GovernanceAction(); // implementation
         return address(
             new TransparentUpgradeableProxy(address(governanceActionImpl), _tabProxyAdmin, governanceActionInitData)
         );
     }
 
-    function deployVaultManager(address _governanceTimelockController, address _deployer, address _tabProxyAdmin) internal returns(address) {
+    function deployVaultManager(address _governanceTimelockController, address _emergencyTimelockController, address _deployer, address _tabProxyAdmin) internal returns(address) {
         bytes memory vaultManagerInitData =
-            abi.encodeWithSignature("initialize(address,address,address)", _governanceTimelockController, _deployer, _deployer);
+            abi.encodeWithSignature("initialize(address,address,address,address)", _governanceTimelockController, _emergencyTimelockController, _deployer, _deployer);
         VaultManager vaultManagerImpl = new VaultManager(); // implementation
         return address(
             new TransparentUpgradeableProxy(address(vaultManagerImpl), _tabProxyAdmin, vaultManagerInitData)
@@ -243,14 +252,15 @@ contract Deploy is Script {
     }
 
     function deployPriceOracleManager(
-        address _governanceTimelockController, 
+        address _governanceTimelockController,
+        address _emergencyTimelockController,
         address _governanceAction, 
         address _deployer, 
         address _tabRegistry, 
         address _tabProxyAdmin
     ) internal returns(address) {
         bytes memory priceOracleManagerInitData = abi.encodeWithSignature(
-            "initialize(address,address,address,address,address)", _governanceTimelockController, _governanceAction, _deployer, _deployer, _tabRegistry
+            "initialize(address,address,address,address,address,address)", _governanceTimelockController, _emergencyTimelockController, _governanceAction, _deployer, _deployer, _tabRegistry
         );
         PriceOracleManager priceOracleManagerImpl = new PriceOracleManager(); // implementation
         return address(
@@ -258,9 +268,9 @@ contract Deploy is Script {
         );
     }
 
-    function deployVaultKeeper(address _governanceTimelockController, address _deployer, address _vaultManager, address _config, address _tabProxyAdmin) internal returns(address) {
+    function deployVaultKeeper(address _governanceTimelockController, address _emergencyTimelockController, address _deployer, address _vaultManager, address _config, address _tabProxyAdmin) internal returns(address) {
         bytes memory vaultKeeperInitData = abi.encodeWithSignature(
-            "initialize(address,address,address,address,address)", _governanceTimelockController, _deployer, _deployer, _vaultManager, _config
+            "initialize(address,address,address,address,address,address)", _governanceTimelockController, _emergencyTimelockController, _deployer, _deployer, _vaultManager, _config
         );
         VaultKeeper vaultKeeperImpl = new VaultKeeper(); // implementation
         return address(
@@ -323,7 +333,6 @@ contract Deploy is Script {
         Address.functionCall(TabRegistry(tabRegistry).tabs(sUSD), grantRoleData);
         Address.functionCall(TabRegistry(tabRegistry).tabs(sMYR), grantRoleData);
 
-        // TODO
         VaultKeeper(vaultKeeper).setRiskPenaltyFrameInSecond(24 hours);
 
         // GovernanceAction(governanceAction).ctrlAltDel(sUSD, 37000000000000000000000);

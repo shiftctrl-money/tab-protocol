@@ -29,7 +29,7 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
         address tab; // minted tab currency
         uint256 tabAmt; // tab currency value (18 decimals)
         uint256 osTabAmt; // other O/S tab, e.g. risk penalty or fee amt
-        uint256 pendingOsMint; //  osTabAmt to be minted out
+        uint256 pendingOsMint; // osTabAmt to be minted out
     }
 
     address[] public ownerList;
@@ -88,11 +88,12 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
         _disableInitializers();
     }
 
-    function initialize(address _admin, address _deployer, address _ui) public initializer {
+    function initialize(address _admin, address _admin2, address _deployer, address _ui) public initializer {
         __AccessControlDefaultAdminRules_init(1 days, _admin);
         __UUPSUpgradeable_init();
 
         _grantRole(DEPLOYER_ROLE, _admin);
+        _grantRole(DEPLOYER_ROLE, _admin2);
         _grantRole(DEPLOYER_ROLE, _deployer);
         _grantRole(UI_ROLE, _ui);
         _setRoleAdmin(KEEPER_ROLE, DEPLOYER_ROLE);
@@ -152,9 +153,11 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
         address reserveAddr = reserveRegistry.reserveAddr(_reserveKey);
         address reserveSafe = reserveRegistry.reserveSafeAddr(_reserveKey);
         require(
-            reserveAddr != address(0) && reserveSafe != address(0) && reserveRegistry.enabledReserve(_reserveKey), "INVALID_RESERVE"
+            reserveAddr != address(0) && reserveSafe != address(0) && reserveRegistry.enabledReserve(_reserveKey),
+            "INVALID_RESERVE"
         );
-        SafeTransferLib.safeTransferFrom(reserveAddr, _vaultOwner, reserveSafe, _reserveAmt); // assume approve called on vault
+        SafeTransferLib.safeTransferFrom(reserveAddr, _vaultOwner, reserveSafe, _reserveAmt); // assume approve called
+            // on vault
             // manager b4
 
         // load config
@@ -219,11 +222,8 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
 
             // record & transfer out additional tab withdrew
             require(
-                (
-                    _maxWithdraw(
-                        _reserveValue(price, v.reserveAmt), minReserveRatio, v.tabAmt + v.osTabAmt + chargedFee
-                    )
-                ) >= _tabAmt,
+                (_maxWithdraw(_reserveValue(price, v.reserveAmt), minReserveRatio, v.tabAmt + v.osTabAmt + chargedFee))
+                    >= _tabAmt,
                 "WITHDRAW_EXTRA_MRR"
             );
             v.tabAmt += _tabAmt;
@@ -321,7 +321,8 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
                 reserveAddr != address(0) && reserveSafe != address(0) && reserveRegistry.enabledReserve(reserveKey),
                 "INVALID_RESERVE"
             );
-            SafeTransferLib.safeTransferFrom(reserveAddr, _vaultOwner, reserveSafe, _reserveAmt); // assume approve called on vault
+            SafeTransferLib.safeTransferFrom(reserveAddr, _vaultOwner, reserveSafe, _reserveAmt); // assume approve
+                // called on vault
                 // manager b4
 
             // mint O/S fee amt to treasury (if any)
@@ -458,9 +459,7 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
                     // Revert if the vault breaches liquidation ratio with supplied _btcTabRate
                     if (
                         vaultKeeper.isLiquidatingVault(
-                            reserveRegistry.reserveKey(v.reserveAddr),
-                            _reserveValue(_btcTabRate, v.reserveAmt),
-                            totalOS
+                            reserveRegistry.reserveKey(v.reserveAddr), _reserveValue(_btcTabRate, v.reserveAmt), totalOS
                         )
                     ) {
                         revert LiquidatingVault(ownerList[i], ownerVaultIds[n]);
@@ -509,13 +508,9 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
                 break;
             }
 
-            IProtocolVault(_protocolVaultAddr).initCtrlAltDel(
-                addrs[i], reserves[i], tabAddr, tabAmts[i], _btcTabRate
-            );
+            IProtocolVault(_protocolVaultAddr).initCtrlAltDel(addrs[i], reserves[i], tabAddr, tabAmts[i], _btcTabRate);
             // transfer reserve from Safe to ProtocolVault contract
-            IReserveSafe(reserveRegistry.reserveAddrSafe(addrs[i])).unlockReserve(
-                _protocolVaultAddr, reserves[i]
-            );
+            IReserveSafe(reserveRegistry.reserveAddrSafe(addrs[i])).unlockReserve(_protocolVaultAddr, reserves[i]);
         }
 
         emit CtrlAltDel(_tab, _btcTabRate, data.totalTabAmt, data.totalReserve, data.totalReserveConso);

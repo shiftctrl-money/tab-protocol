@@ -40,14 +40,14 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
     struct Info {
         address paymentTokenAddress;
         uint256 paymentAmtPerFeed;
-        uint256 blockCountPerFeed; 
+        uint256 blockCountPerFeed;
         uint256 feedSize;
         bytes32 whitelistedIPAddr;
     }
 
     struct OracleProvider {
         uint256 index;
-        uint256 activatedSinceBlockId;
+        uint256 activatedSinceBlockNum;
         uint256 activatedTimestamp;
         uint256 disabledOnBlockId;
         uint256 disabledTimestamp;
@@ -130,6 +130,7 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
     function initialize(
         address _admin,
         address _admin2,
+        address _governanceAction,
         address _deployer,
         address _authorizedCaller,
         address _tabRegistry
@@ -142,10 +143,12 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
 
         _grantRole(MAINTAINER_ROLE, _admin);
         _grantRole(MAINTAINER_ROLE, _admin2);
+        _grantRole(MAINTAINER_ROLE, _governanceAction);
         _grantRole(MAINTAINER_ROLE, _deployer);
         _grantRole(MAINTAINER_ROLE, _authorizedCaller);
         _grantRole(CONFIG_ROLE, _admin);
         _grantRole(CONFIG_ROLE, _admin2);
+        _grantRole(CONFIG_ROLE, _governanceAction);
         _grantRole(CONFIG_ROLE, _tabRegistry);
         _setRoleAdmin(PAYMENT_ROLE, MAINTAINER_ROLE);
 
@@ -178,7 +181,7 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
     function activeProvider(address _addr) external view returns (bool) {
         OracleProvider memory prv = providers[_addr];
         return prv.disabledOnBlockId == 0 && prv.disabledTimestamp == 0 && prv.paused == false
-            && block.number >= prv.activatedSinceBlockId && block.timestamp >= prv.activatedTimestamp;
+            && block.number >= prv.activatedSinceBlockNum && block.timestamp >= prv.activatedTimestamp;
     }
 
     function activeProviderCount() public view returns (uint256 x) {
@@ -186,7 +189,7 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
             OracleProvider memory prv = providers[providerList[i]];
             if (
                 prv.disabledOnBlockId == 0 && prv.disabledTimestamp == 0 && prv.paused == false
-                    && block.number >= prv.activatedSinceBlockId && block.timestamp >= prv.activatedTimestamp
+                    && block.number >= prv.activatedSinceBlockNum && block.timestamp >= prv.activatedTimestamp
             ) {
                 x++;
             }
@@ -241,9 +244,8 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
         onlyRole(MAINTAINER_ROLE)
     {
         providers[provider] = OracleProvider(providerList.length, blockNum, timestamp, 0, 0, false);
-        providerInfo[provider] = Info(
-            paymentTokenAddress, paymentAmtPerFeed, blockCountPerFeed, feedSize, whitelistedIPAddr
-        );
+        providerInfo[provider] =
+            Info(paymentTokenAddress, paymentAmtPerFeed, blockCountPerFeed, feedSize, whitelistedIPAddr);
         providerTracker[provider] = Tracker(timestamp, block.number, block.number, 0, 0);
         providerList.push(provider);
         _grantRole(PAYMENT_ROLE, provider);
@@ -282,12 +284,7 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
         providerInfo[provider].feedSize = feedSize;
         providerInfo[provider].whitelistedIPAddr = whitelistedIPAddr;
         emit ConfigProvider(
-            provider,
-            paymentTokenAddress,
-            paymentAmtPerFeed,
-            blockCountPerFeed,
-            feedSize,
-            whitelistedIPAddr
+            provider, paymentTokenAddress, paymentAmtPerFeed, blockCountPerFeed, feedSize, whitelistedIPAddr
         );
     }
 
@@ -316,8 +313,7 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
     }
 
     /**
-     * @dev System rejects feed from paused provider. Provider still can withdraw payment (if o/s payment existed) when
-     * paused.
+     * @dev System rejects feed from paused provider. Can withdraw payment when paused.
      * @param _provider Provider address.
      */
     function pauseProvider(address _provider) external onlyRole(MAINTAINER_ROLE) {
@@ -426,10 +422,9 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
                     tracker = providerTracker[_providerList[i]];
 
                     amtToPay = 0;
-                    timeSpanSinceLastUpdated = 
-                        FixedPointMathLib.zeroFloorSub(_timestamp, tracker.lastUpdatedTimestamp);
+                    timeSpanSinceLastUpdated = FixedPointMathLib.zeroFloorSub(_timestamp, tracker.lastUpdatedTimestamp);
                     if (timeSpanSinceLastUpdated > 0) {
-                        // estimated block count in tracking session / number of blocks of each feed 
+                        // estimated block count in tracking session / number of blocks of each feed
                         // = expect feed count in tracking session
                         uint256 sessionFeedCount =
                             timeSpanSinceLastUpdated / defBlockGenerationTimeInSecond / info.blockCountPerFeed;
@@ -438,11 +433,13 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
                             tracker.feedMissCount += numberOfMissedFeed; // no action, accumulated for alert only
                             emit MissedFeed(_providerList[i], numberOfMissedFeed, tracker.feedMissCount);
 
-                            if (_feedCount[i] > 0)
+                            if (_feedCount[i] > 0) {
                                 amtToPay = _feedCount[i] * info.paymentAmtPerFeed;
-                        } else
+                            }
+                        } else {
                             amtToPay = sessionFeedCount * info.paymentAmtPerFeed;
-                        
+                        }
+
                         if (amtToPay > 0) {
                             tracker.osPayment += amtToPay;
                             emit PaymentReady(_providerList[i], amtToPay, tracker.osPayment);

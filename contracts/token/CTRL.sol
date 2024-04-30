@@ -35,13 +35,12 @@ contract CTRL is
         __AccessControlDefaultAdminRules_init(1 days, _deployer);
         __ERC20Permit_init("shiftCTRL");
         __ERC20Votes_init();
-        __ERC20Capped_init(10 ** 9 * 10 ** 18); // CAP = 1 billion = 1,000,000,000
+        __ERC20Capped_init(10 ** 9 * 10 ** 18); // value 1000000000000000000000000000
+        // CAP = 1 billion = 1,000,000,000
         __UUPSUpgradeable_init();
 
-        _setRoleAdmin(UPGRADER_ROLE, DEFAULT_ADMIN_ROLE);
-        _setRoleAdmin(MINTER_ROLE, DEFAULT_ADMIN_ROLE);
-
         _grantRole(UPGRADER_ROLE, _deployer);
+
         _grantRole(MINTER_ROLE, _deployer);
     }
 
@@ -50,8 +49,6 @@ contract CTRL is
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) { }
-
-    // The following functions are overrides required by Solidity.
 
     function _afterTokenTransfer(
         address from,

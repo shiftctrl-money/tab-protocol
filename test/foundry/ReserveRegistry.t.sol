@@ -17,7 +17,7 @@ contract ReserveRegistryTest is Test {
     event RemovedReserve(bytes32 key);
 
     function setUp() public {
-        registry = new ReserveRegistry(address(this), address(this), address(this));
+        registry = new ReserveRegistry(address(this), address(this), address(this), address(this));
         mockToken = new MockERC20();
     }
 
