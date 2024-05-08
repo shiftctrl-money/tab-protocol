@@ -9,6 +9,7 @@ import "../contracts/TabProxyAdmin.sol";
 import "../contracts/token/CTRL.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
+import {ISkybitCreate3Factory} from "../contracts/shared/interfaces/ISkybitCreate3Factory.sol";
 import "../contracts/token/CBTC.sol";
 import "../contracts/governance/TimelockController.sol";
 import "../contracts/governance/ShiftCtrlGovernor.sol";
@@ -27,6 +28,7 @@ import "../contracts/oracle/interfaces/IPriceOracleManager.sol";
 import "../contracts/oracle/PriceOracleManager.sol";
 import "../contracts/VaultKeeper.sol";
 import "../contracts/ProtocolVault.sol";
+import "../test/foundry/helper/RateSimulator.sol";
 
 // https://www.0xdev.co/how-to-write-scripts-in-solidity-using-foundry/
 // FOR LOCAL TEST ONLY
@@ -40,6 +42,9 @@ contract Deploy is Script {
     bytes32 reserve_cBTC = keccak256("CBTC");
 
     address deployer = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266; // 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+    // deploy from deployKeylessly-Create3Factory.js, factoryToDeploy = `SKYBITSolady`
+    // fork arbitrumSepolia or sepolia, or deploy the create3 factory in local node
+    address skybitCreate3Factory = 0xA8D5D2166B1FB90F70DF5Cc70EA7a1087bCF1750;
     address UI_USER = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;  // 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
     address TREASURY = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; // 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a
     address PRICE_RELAYER = 0x90F79bf6EB2c4f870365E785982E1f101E93b906; // 0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6
@@ -159,7 +164,16 @@ contract Deploy is Script {
         console.log("TabRegistry: ", tabRegistry);
         TabRegistry(tabRegistry).setGovernanceAction(governanceAction);
 
-        tabFactory = address(new TabFactory(deployer, tabRegistry));
+        // tabFactory = address(new TabFactory(deployer, tabRegistry));
+        
+        // Given same deployer address, expected TabFactory to be deployed on same address in EVM chains
+        // Tab addresses created from TabFactory are expected to be consistent on EVM chains
+        // Expect TabFactory address: 0xc8a5B8773CE13AAf0ac994C8827a3692C5F61Aba
+        tabFactory = ISkybitCreate3Factory(skybitCreate3Factory).deploy(
+            keccak256(abi.encodePacked("shiftCTRL TabFactory_v1")), 
+            abi.encodePacked(type(TabFactory).creationCode, abi.encode(deployer, tabRegistry))
+        );
+
         TabRegistry(tabRegistry).setTabFactory(tabFactory);
         console.log("TabFactory: ", address(tabFactory));
 
@@ -298,7 +312,7 @@ contract Deploy is Script {
         GovernanceAction(governanceAction).createNewTab(bytes3(abi.encodePacked("JPY")));
         GovernanceAction(governanceAction).createNewTab(sMYR);
 
-        // test multiple submissions of price (exceeded 10 price per submission)
+        test multiple submissions of price (exceeded 10 price per submission)
         GovernanceAction(governanceAction).createNewTab(bytes3(abi.encodePacked("STD")));
         GovernanceAction(governanceAction).createNewTab(bytes3(abi.encodePacked("XAU")));
         GovernanceAction(governanceAction).createNewTab(bytes3(abi.encodePacked("CLF")));
@@ -318,6 +332,13 @@ contract Deploy is Script {
         // GovernanceAction(governanceAction).createNewTab(bytes3(abi.encodePacked("ILS")));
         // GovernanceAction(governanceAction).createNewTab(bytes3(abi.encodePacked("INR")));
         // GovernanceAction(governanceAction).createNewTab(bytes3(abi.encodePacked("ISK")));
+
+        // RateSimulator rateSimulator = new RateSimulator();
+        // (bytes3[160] memory t, ) = rateSimulator.retrieve160(0);
+        // for (uint256 i = 0; i < 160; i++) {
+        //     GovernanceAction(governanceAction).createNewTab(t[i]);
+        //     console.log(TabERC20(TabRegistry(tabRegistry).tabs(t[i])).symbol(), TabRegistry(tabRegistry).tabs(t[i]));
+        // }
 
         PriceOracle(priceOracle).setDirectPrice(sUSD, 37086793778438155432848, block.timestamp);
         PriceOracle(priceOracle).setDirectPrice(sMYR, 174603438331485931421445, block.timestamp);

@@ -6,9 +6,7 @@ import { IPriceOracle } from "./oracle/interfaces/IPriceOracle.sol";
 import { IConfig } from "./shared/interfaces/IConfig.sol";
 import { ITabFactory } from "./shared/interfaces/ITabFactory.sol";
 import { IVaultManager } from "./shared/interfaces/IVaultManager.sol";
-import "@openzeppelin/contracts/proxy/Clones.sol";
-import "@openzeppelin/contracts/access/AccessControlDefaultAdminRules.sol";
-import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { AccessControlDefaultAdminRules } from "@openzeppelin/contracts/access/AccessControlDefaultAdminRules.sol";
 
 contract TabRegistry is AccessControlDefaultAdminRules {
 
@@ -199,8 +197,8 @@ contract TabRegistry is AccessControlDefaultAdminRules {
         }
         string memory _symbol = toTabCode(_tab);
         string memory _name = string(abi.encodePacked("Sound ", _tab));
-        address tabContract = ITabFactory(tabFactory).createTab(_tab);
-        address createdAddr = newTab(_name, _symbol, tabContract, defaultAdmin(), vaultManager);
+        address createdAddr =
+            ITabFactory(tabFactory).createTab(_tab, _name, _symbol, defaultAdmin(), vaultManager, tabProxyAdmin);
         tabs[_tab] = createdAddr;
         tabList.push(_tab);
         activatedTabCount = activatedTabCount + 1;
@@ -251,22 +249,6 @@ contract TabRegistry is AccessControlDefaultAdminRules {
         require(_tab[2] != 0x0, "INVALID_3RD_TAB_CHAR");
         b[3] = _tab[2];
         return string(b);
-    }
-
-    function newTab(
-        string memory _name,
-        string memory _symbol,
-        address _tabContract,
-        address _admin,
-        address _vaultManager
-    )
-        internal
-        returns (address)
-    {
-        // create and return proxy address
-        bytes memory initData =
-            abi.encodeWithSignature("initialize(string,string,address,address)", _name, _symbol, _admin, _vaultManager);
-        return address(new TransparentUpgradeableProxy(_tabContract, tabProxyAdmin, initData));
     }
 
 }
