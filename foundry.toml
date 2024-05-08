@@ -5,6 +5,7 @@ libs = ["node_modules", "lib"]
 test = "test/foundry"
 cache_path = "forge-cache"
 # viaIR = true
+evm_version = "shanghai"
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 

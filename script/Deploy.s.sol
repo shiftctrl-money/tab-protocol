@@ -8,6 +8,7 @@ import "../contracts/TabProxyAdmin.sol";
 import "../contracts/token/CTRL.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
+import {ISkybitCreate3Factory} from "../contracts/shared/interfaces/ISkybitCreate3Factory.sol";
 import "../contracts/token/CBTC.sol";
 import "../contracts/governance/TimelockController.sol";
 import "../contracts/governance/ShiftCtrlGovernor.sol";
@@ -38,6 +39,8 @@ contract Deploy is Script {
     bytes32 reserve_cBTC = keccak256("CBTC");
 
     address deployer = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266; // 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+    // deploy from deployKeylessly-Create3Factory.js, factoryToDeploy = `SKYBITSolady`
+    address skybitCreate3Factory = 0xA8D5D2166B1FB90F70DF5Cc70EA7a1087bCF1750;
     address UI_USER = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;  // 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
     address TREASURY = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; // 0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a
     address PRICE_RELAYER = 0x90F79bf6EB2c4f870365E785982E1f101E93b906; // 0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6
@@ -130,7 +133,16 @@ contract Deploy is Script {
         console.log("TabRegistry: ", tabRegistry);
         TabRegistry(tabRegistry).setGovernanceAction(governanceAction);
 
-        tabFactory = address(new TabFactory(governanceTimelockController, tabRegistry));
+        // tabFactory = address(new TabFactory(governanceTimelockController, tabRegistry));
+
+        // Given same deployer address, expected TabFactory to be deployed on same address in EVM chains
+        // Tab addresses created from TabFactory are expected to be consistent on EVM chains
+        // Expect TabFactory address: 0xc8a5B8773CE13AAf0ac994C8827a3692C5F61Aba
+        tabFactory = ISkybitCreate3Factory(skybitCreate3Factory).deploy(
+            keccak256(abi.encodePacked("shiftCTRL TabFactory_v1")), 
+            abi.encodePacked(type(TabFactory).creationCode, abi.encode(governanceTimelockController, tabRegistry))
+        );
+
         TabRegistry(tabRegistry).setTabFactory(tabFactory);
         console.log("TabFactory: ", tabFactory);
 

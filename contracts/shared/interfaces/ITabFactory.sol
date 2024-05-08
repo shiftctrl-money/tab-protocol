@@ -3,6 +3,15 @@ pragma solidity ^0.8.20;
 
 interface ITabFactory {
 
-    function createTab(bytes3 _tabName) external returns (address);
+    function createTab(
+        bytes3 _tabName,
+        string memory _name,
+        string memory _symbol,
+        address _admin,
+        address _vaultManager,
+        address _tabProxyAdmin
+    )
+        external
+        returns (address);
 
 }
