@@ -90,7 +90,7 @@ contract Deploy is Script {
         
         ShiftCtrlGovernor governor = new ShiftCtrlGovernor(IVotes(ctrl), delayedTimelock);
         shiftCtrlGovernor = address(governor);
-        ShiftCtrlEmergencyGovernor emergencyGovernor = new ShiftCtrlEmergencyGovernor(IVotes(ctrl), delayedTimelock);
+        ShiftCtrlEmergencyGovernor emergencyGovernor = new ShiftCtrlEmergencyGovernor(IVotes(ctrl), emergencyTimelock);
         shiftCtrlEmergencyGovernor = address(emergencyGovernor);
         
         delayedTimelock.grantRole(EXECUTOR_ROLE, shiftCtrlGovernor);
