@@ -121,7 +121,7 @@ contract Deploy is Script {
         
         ShiftCtrlGovernor governor = new ShiftCtrlGovernor(IVotes(ctrl), delayedTimelock);
         shiftCtrlGovernor = address(governor);
-        ShiftCtrlEmergencyGovernor emergencyGovernor = new ShiftCtrlEmergencyGovernor(IVotes(ctrl), delayedTimelock);
+        ShiftCtrlEmergencyGovernor emergencyGovernor = new ShiftCtrlEmergencyGovernor(IVotes(ctrl), emergencyTimelock);
         shiftCtrlEmergencyGovernor = address(emergencyGovernor);
         
         delayedTimelock.grantRole(EXECUTOR_ROLE, shiftCtrlGovernor);
@@ -312,7 +312,7 @@ contract Deploy is Script {
         GovernanceAction(governanceAction).createNewTab(bytes3(abi.encodePacked("JPY")));
         GovernanceAction(governanceAction).createNewTab(sMYR);
 
-        test multiple submissions of price (exceeded 10 price per submission)
+        // test multiple submissions of price (exceeded 10 price per submission)
         GovernanceAction(governanceAction).createNewTab(bytes3(abi.encodePacked("STD")));
         GovernanceAction(governanceAction).createNewTab(bytes3(abi.encodePacked("XAU")));
         GovernanceAction(governanceAction).createNewTab(bytes3(abi.encodePacked("CLF")));
