@@ -50,7 +50,7 @@ Please refer to deployed smart contract addresses below:
 |PriceOracleManager							|[0x6C7deFcCf6c3bfF17BE5B241a29fA691f0E46509](https://sepolia.arbiscan.io/address/0x6C7deFcCf6c3bfF17BE5B241a29fA691f0E46509)|
 |PriceOracle								|[0x2fd5AF90C453B931179B2aDDF901e2E649fE6623](https://sepolia.arbiscan.io/address/0x2fd5AF90C453B931179B2aDDF901e2E649fE6623)|
 |VaultKeeper								|[0xae7a2C1eB2F7d9AFEEDCF1c850D97659087F38Ff](https://sepolia.arbiscan.io/address/0xae7a2C1eB2F7d9AFEEDCF1c850D97659087F38Ff)|
-|ProtocolVault 								|Pending deployment|
+|ProtocolVault 								|[0x67E332459A81F3d64142829541b6fec608356B63](https://sepolia.arbiscan.io/address/0x67E332459A81F3d64142829541b6fec608356B63)|
 
 
 ## Contributing
