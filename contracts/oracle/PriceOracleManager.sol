@@ -5,7 +5,6 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlDefaultAdminRulesUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/proxy/Clones.sol";
 import "lib/solady/src/utils/FixedPointMathLib.sol";
 import "./../shared/interfaces/IERC20.sol";
 import "./interfaces/IPriceOracle.sol";
@@ -65,7 +64,7 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
         bytes3 tab;
         uint256 timestamp;
         uint256 listSize;
-        uint256[9] mediumList;
+        uint256[9] medianList;
     }
 
     struct CID {
@@ -120,7 +119,7 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
     event GiveUpPayment(address indexed provider, uint256 amt);
 
     error InsufficientBalance(uint256 requiredAmt);
-    error InvalidMediumValue(bytes3 _tab, uint256 _timestamp);
+    error InvalidMedianValue(bytes3 _tab, uint256 _timestamp);
     error EmptyCID(bytes32 cidPart);
 
     constructor() {
@@ -161,6 +160,10 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
     // Refer UUPSUpgradeable:
     // The {_authorizeUpgrade} function must be overridden to include access restriction to the upgrade mechanism.
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) { }
+
+    function setOraclePriceSize(uint256 size) external onlyRole(CONFIG_ROLE) {
+        ORACLE_PRICE_SIZE = size;
+    }
 
     function addNewTab(bytes3 _tab) external onlyRole(CONFIG_ROLE) {
         tabList.push(_tab);
@@ -470,35 +473,35 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
                 // ignore if timestamp == 0, which is placehoolder to fill up TabPool fixed array of 10 items
                 _tab = _tabPool[i].tab;
 
-                // get medium value from sorted list
-                uint256 mediumValue = 0;
-                uint256[] memory actualMediumList = new uint256[](_tabPool[i].listSize);
+                // get median value from sorted list
+                uint256 medianValue = 0;
+                uint256[] memory actualMedianList = new uint256[](_tabPool[i].listSize);
                 for (uint256 n = 0; n < _tabPool[i].listSize; n++) {
-                    actualMediumList[n] = _tabPool[i].mediumList[n];
+                    actualMedianList[n] = _tabPool[i].medianList[n];
                 }
-                mediumValue = getMedianPrice(actualMediumList);
+                medianValue = getMedianPrice(actualMedianList);
 
-                if (mediumValue == 0) {
-                    revert InvalidMediumValue(_tab, _timestamp);
+                if (medianValue == 0) {
+                    revert InvalidMedianValue(_tab, _timestamp);
                 }
 
                 // update price if:
                 // (1) price changes exceeded configured threshold
                 // (2) price last changed timestamp exceeded configured inactivePeriod
                 if (
-                    calcDiffPercentage(prices[_tab], mediumValue) > movementDelta
+                    calcDiffPercentage(prices[_tab], medianValue) > movementDelta
                         || _timestamp >= lastUpdated[_tab] + inactivePeriod
                 ) {
                     _tabs[tabCount] = _tab;
-                    _prices[tabCount] = mediumValue;
+                    _prices[tabCount] = medianValue;
                     _lastUpdated[tabCount] = _timestamp;
 
-                    prices[_tab] = mediumValue;
+                    prices[_tab] = medianValue;
                     lastUpdated[_tab] = _timestamp;
 
                     tabCount = unsafe_inc(tabCount);
                 } else {
-                    emit IgnoredPrice(_tab, _timestamp, mediumValue, prices[_tab]);
+                    emit IgnoredPrice(_tab, _timestamp, medianValue, prices[_tab]);
                 }
             }
         }
