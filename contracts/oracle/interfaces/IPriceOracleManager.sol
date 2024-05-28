@@ -79,7 +79,7 @@ interface IPriceOracleManager {
         bytes3 tab;
         uint256 timestamp;
         uint256 listSize;
-        uint256[9] mediumList;
+        uint256[9] medianList;
     }
 
     struct CID {

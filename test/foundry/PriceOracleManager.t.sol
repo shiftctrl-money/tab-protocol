@@ -33,7 +33,7 @@ contract PriceOracleManagerTest is Test, Deployer {
         bytes3 tab;
         uint256 timestamp;
         uint256 listSize;
-        uint256[9] mediumList;
+        uint256[9] medianList;
     }
 
     TabPool[10] tabPools;
@@ -555,18 +555,18 @@ contract PriceOracleManagerTest is Test, Deployer {
 
         // changed price +10%, expect price is accepted & updated
         for (uint256 i = 0; i < tabPools.length; i++) {
-            tabPools[i].mediumList[4] = FixedPointMathLib.mulDiv(tabPools[i].mediumList[4], 110, 100);
-        } // medium item is changed
+            tabPools[i].medianList[4] = FixedPointMathLib.mulDiv(tabPools[i].medianList[4], 110, 100);
+        } // median item is changed
         updatePriceData = abi.encodeWithSignature(
             "updatePrice((bytes3,uint256,uint256,uint256[9])[10],(bytes32,bytes32))", tabPools, cidParts
         );
         vm.expectEmit(address(priceOracle));
-        emit UpdatedPrice(tabPools[0].tab, oldPrice, tabPools[0].mediumList[4], tabPools[0].timestamp);
+        emit UpdatedPrice(tabPools[0].tab, oldPrice, tabPools[0].medianList[4], tabPools[0].timestamp);
         data = Address.functionCall(priceOracleManagerAddr, updatePriceData);
 
         nextBlock(30 minutes);
 
-        oldPrice = tabPools[0].mediumList[4];
+        oldPrice = tabPools[0].medianList[4];
         updatePriceData = abi.encodeWithSignature(
             "updatePrice((bytes3,uint256,uint256,uint256[9])[10],(bytes32,bytes32))", tabPools, cidParts
         );
@@ -594,7 +594,7 @@ contract PriceOracleManagerTest is Test, Deployer {
             "updatePrice((bytes3,uint256,uint256,uint256[9])[10],(bytes32,bytes32))", tabPools, cidParts
         );
         vm.expectEmit(address(priceOracle));
-        emit UpdatedPrice(tabPools[0].tab, 0, tabPools[0].mediumList[4], tabPools[0].timestamp);
+        emit UpdatedPrice(tabPools[0].tab, 0, tabPools[0].medianList[4], tabPools[0].timestamp);
         data = Address.functionCall(priceOracleManagerAddr, updatePriceData);
 
         // expected missing count for 1 hours = 60 * 60 / 12 / 25 = 12
@@ -625,12 +625,12 @@ contract PriceOracleManagerTest is Test, Deployer {
         priceOracleManager.submitProviderFeedCount(providerList, feedCount, block.timestamp);
     }
 
-    function testUpdatePrice_mediumList() public {
+    function testUpdatePrice_medianList() public {
         for (uint256 i = 0; i < 10; i++) {
             tabPools[i].listSize = 4;
-        } // even medium list size
+        } // even median list size
         for (uint256 i = 4; i < 9; i++) {
-            tabPools[0].mediumList[i] = 0;
+            tabPools[0].medianList[i] = 0;
         }
 
         updatePriceData = abi.encodeWithSignature(
@@ -638,7 +638,7 @@ contract PriceOracleManagerTest is Test, Deployer {
         );
         vm.expectEmit(address(priceOracle));
         emit UpdatedPrice(
-            tabPools[0].tab, 0, (tabPools[0].mediumList[1] + tabPools[0].mediumList[2]) / 2, tabPools[0].timestamp
+            tabPools[0].tab, 0, (tabPools[0].medianList[1] + tabPools[0].medianList[2]) / 2, tabPools[0].timestamp
         );
         data = Address.functionCall(priceOracleManagerAddr, updatePriceData);
     }

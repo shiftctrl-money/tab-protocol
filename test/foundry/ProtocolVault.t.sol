@@ -46,7 +46,7 @@ contract ProtocolVaultTest is Test, Deployer {
         bytes3 tab;
         uint256 timestamp;
         uint256 listSize;
-        uint256[9] mediumList;
+        uint256[9] medianList;
     }
 
     TabPool[10] tabPools;
@@ -291,7 +291,7 @@ contract ProtocolVaultTest is Test, Deployer {
         );
 
         vm.expectEmit(address(priceOracle));
-        emit UpdatedPrice(tab10[0], tabPools[0].mediumList[4], fixedPrice, block.timestamp);
+        emit UpdatedPrice(tab10[0], tabPools[0].medianList[4], fixedPrice, block.timestamp);
 
         vm.expectEmit(address(tabRegistry));
         emit CtrlAltDelTab(tab10[0], fixedPrice);
@@ -737,7 +737,7 @@ contract ProtocolVaultTest is Test, Deployer {
         emit CtrlAltDel(tab10[4], fixedPrice, 891166e18, 73e18, 445583e14);
 
         vm.expectEmit(address(priceOracle));
-        emit UpdatedPrice(tab10[4], tabPools[4].mediumList[4], fixedPrice, block.timestamp);
+        emit UpdatedPrice(tab10[4], tabPools[4].medianList[4], fixedPrice, block.timestamp);
 
         vm.expectEmit(address(tabRegistry));
         emit CtrlAltDelTab(tab10[4], fixedPrice);
