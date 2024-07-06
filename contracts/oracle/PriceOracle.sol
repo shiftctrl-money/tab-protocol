@@ -3,18 +3,22 @@ pragma solidity ^0.8.20;
 
 import "./interfaces/IPriceOracle.sol";
 import "@openzeppelin/contracts/access/AccessControlDefaultAdminRules.sol";
+import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "lib/solady/src/utils/FixedPointMathLib.sol";
 
-contract PriceOracle is IPriceOracle, Pausable, AccessControlDefaultAdminRules {
+contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdminRules {
 
     bytes32 public constant FEEDER_ROLE = keccak256("FEEDER_ROLE");
     bytes32 public constant TAB_REGISTRY_ROLE = keccak256("TAB_REGISTRY_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-    bytes32 public constant USER_ROLE = keccak256("USER_ROLE");
 
     mapping(bytes3 => uint256) private prices; // 18-decimals, tab code : price (base currency BTC, quote currency TAB)
     mapping(bytes3 => uint256) public lastUpdated;
+
+    // EIP712
+    mapping(address => uint256) public nonces;
+    bytes32 private constant _DATA_TYPEHASH = keccak256("UpdatePriceData(address owner,address updater,bytes3 tab,uint256 price,uint256 timestamp,uint256 nonce)");
 
     // ctrl-alt-del
     mapping(bytes3 => uint256) public ctrlAltDelTab; // >0 when the tab(key) is now set to fixed price
@@ -35,16 +39,16 @@ contract PriceOracle is IPriceOracle, Pausable, AccessControlDefaultAdminRules {
         address _priceOracleManager,
         address _tabRegistry
     )
+        EIP712("PriceOracle", "1") 
         AccessControlDefaultAdminRules(1 days, _admin)
     {
         _grantRole(FEEDER_ROLE, _admin);
         _grantRole(FEEDER_ROLE, _admin2);
         _grantRole(FEEDER_ROLE, _priceOracleManager);
+        _grantRole(FEEDER_ROLE, _vaultManager);
 
         _grantRole(PAUSER_ROLE, _admin);
         _grantRole(PAUSER_ROLE, _admin2);
-
-        _grantRole(USER_ROLE, _vaultManager);
 
         _grantRole(TAB_REGISTRY_ROLE, _tabRegistry);
         inactivePeriod = 1 hours;
@@ -62,7 +66,7 @@ contract PriceOracle is IPriceOracle, Pausable, AccessControlDefaultAdminRules {
         _requireNotPaused();
 
         if (_lastUpdated <= lastUpdated[tabCode]) {
-            revert OutdatedPrice(_lastUpdated);
+            revert OutdatedPrice(tabCode, _lastUpdated);
         }
 
         if (ctrlAltDelTab[tabCode] > 0) {
@@ -113,7 +117,45 @@ contract PriceOracle is IPriceOracle, Pausable, AccessControlDefaultAdminRules {
         }
     }
 
-    function getPrice(bytes3 _tab) external view onlyRole(USER_ROLE) returns (uint256) {
+    function updatePrice(UpdatePriceData calldata priceData) external onlyRole(FEEDER_ROLE) returns (uint256) {
+        _requireNotPaused();
+        if (ctrlAltDelTab[priceData.tab] > 0) {
+            return _getPrice(priceData.tab);
+        }
+        
+        if (priceData.timestamp > lastUpdated[priceData.tab]) { 
+            require(priceData.price > 0, "INVALID_PRICE");
+            bytes32 structHash = keccak256(abi.encode(
+                _DATA_TYPEHASH, 
+                priceData.owner,
+                priceData.updater,
+                priceData.tab,
+                priceData.price,
+                priceData.timestamp,
+                nonces[priceData.updater]
+            ));            
+            address signer = ECDSA.recover(_hashTypedDataV4(structHash), priceData.v, priceData.r, priceData.s);
+
+            require(signer == priceData.owner, "INVALID_SIGNATURE"); // signed by authorized price provider
+            require(block.timestamp <= (priceData.timestamp + inactivePeriod), "EXPIRED");
+            
+            nonces[priceData.updater] += 1;
+
+            if (priceData.price == prices[priceData.tab])
+                return priceData.price;
+            else {
+                emit UpdatedPrice(priceData.tab, prices[priceData.tab], priceData.price, priceData.timestamp);
+                prices[priceData.tab] = priceData.price;
+                lastUpdated[priceData.tab] = priceData.timestamp;
+                
+                return priceData.price;
+            }
+        } else {
+            return _getPrice(priceData.tab);
+        }
+    }
+
+    function _getPrice(bytes3 _tab) internal view returns(uint256) {
         if (peggedTabMap[_tab] == 0x0) {
             require(lastUpdated[_tab] + inactivePeriod > block.timestamp, "INACTIVE");
             return prices[_tab];
@@ -121,6 +163,10 @@ contract PriceOracle is IPriceOracle, Pausable, AccessControlDefaultAdminRules {
             require(lastUpdated[peggedTabMap[_tab]] + inactivePeriod > block.timestamp, "INACTIVE");
             return FixedPointMathLib.mulDiv(prices[peggedTabMap[_tab]], peggedTabPriceRatio[_tab], 100);
         }
+    }
+
+    function getPrice(bytes3 _tab) external view returns (uint256) {
+        return _getPrice(_tab);
     }
 
     function getOldPrice(bytes3 _tab) external view returns (uint256) {

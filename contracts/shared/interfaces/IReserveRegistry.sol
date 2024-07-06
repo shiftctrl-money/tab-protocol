@@ -19,4 +19,12 @@ interface IReserveRegistry {
 
     function removeReserve(bytes32 key) external;
 
+    function reserveDecimals(address) external view returns(uint256);
+
+    function getReserveByKey(bytes32 _key, uint256 _amt) external view returns(address, address, uint256, uint256, uint256);
+
+    function getReserveByAddr(address _reserveContractAddr, uint256 _amt) external view returns(bytes32, address, uint256, uint256, uint256);
+
+    function getOriReserveAmt(address _reserveContractAddr, uint256 _amt) external view returns(uint256,uint256);
+
 }

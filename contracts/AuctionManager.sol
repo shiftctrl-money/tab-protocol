@@ -2,16 +2,18 @@
 pragma solidity ^0.8.20;
 
 import { IVaultManager } from "./shared/interfaces/IVaultManager.sol";
-import "lib/solady/src/utils/FixedPointMathLib.sol";
-import "lib/solady/src/utils/SafeTransferLib.sol";
-import "@openzeppelin/contracts/access/AccessControlDefaultAdminRules.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import { IReserveRegistry } from "./shared/interfaces/IReserveRegistry.sol";
+import { FixedPointMathLib } from "lib/solady/src/utils/FixedPointMathLib.sol";
+import { SafeTransferLib } from "lib/solady/src/utils/SafeTransferLib.sol";
+import { AccessControlDefaultAdminRules } from "@openzeppelin/contracts/access/AccessControlDefaultAdminRules.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 contract AuctionManager is AccessControlDefaultAdminRules, ReentrancyGuard {
 
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
     address public vaultManagerAddr;
+    address public reserveRegistryAddr;
 
     struct AuctionDetails {
         address reserve;
@@ -53,7 +55,7 @@ contract AuctionManager is AccessControlDefaultAdminRules, ReentrancyGuard {
     uint256[] public auctionVaultIds;
     uint256 public maxStep;
 
-    event UpdatedVaultManager(address oldAddr, address newAddr);
+    event UpdatedContractAddr(address oldVMAddr, address newVMAddr, address oldRRAddr, address newRRAddr);
     event ActiveAuction(
         uint256 indexed auctionId,
         address reserve,
@@ -72,7 +74,8 @@ contract AuctionManager is AccessControlDefaultAdminRules, ReentrancyGuard {
     constructor(
         address _admin,
         address _admin2,
-        address _vaultManager
+        address _vaultManager,
+        address _reserveRegistry
     )
         AccessControlDefaultAdminRules(1 days, _admin)
     {
@@ -81,13 +84,15 @@ contract AuctionManager is AccessControlDefaultAdminRules, ReentrancyGuard {
         _grantRole(MANAGER_ROLE, _vaultManager);
 
         vaultManagerAddr = _vaultManager;
+        reserveRegistryAddr = _reserveRegistry;
         auctionCount = 0;
         maxStep = 9; // actual size = 10 with index 9 reserved for min. liquidation price
     }
 
-    function setVaultManager(address _vaultManager) external onlyRole(MANAGER_ROLE) {
-        emit UpdatedVaultManager(vaultManagerAddr, _vaultManager);
+    function setContractAddr(address _vaultManager, address _reserveRegistry) external onlyRole(MANAGER_ROLE) {
+        emit UpdatedContractAddr(vaultManagerAddr, _vaultManager, reserveRegistryAddr, _reserveRegistry);
         vaultManagerAddr = _vaultManager;
+        reserveRegistryAddr = _reserveRegistry;
     }
 
     function setMaxStep(uint256 _maxStep) external onlyRole(MANAGER_ROLE) {
@@ -168,14 +173,16 @@ contract AuctionManager is AccessControlDefaultAdminRules, ReentrancyGuard {
             bidTabAmt = FixedPointMathLib.mulWad(auctionStep.stepPrice, bidQty);
         }
 
-        SafeTransferLib.safeTransferFrom(det.tab, msg.sender, address(this), bidTabAmt); // required approval from
-            // bidder
+        // required approval from bidder
+        SafeTransferLib.safeTransferFrom(det.tab, msg.sender, address(this), bidTabAmt); 
 
         // save bid details
         auctionBid[auctionId].push(AuctionBid(msg.sender, block.timestamp, auctionStep.stepPrice, bidQty));
 
+        (uint256 valueInOriDecimal, uint256 valueInDec18) = IReserveRegistry(reserveRegistryAddr).getOriReserveAmt(det.reserve, bidQty);
+
         // update auction state
-        state.reserveQty = state.reserveQty - bidQty;
+        state.reserveQty = state.reserveQty - valueInDec18;
         state.osTabAmt = (bidQty == auctionAvailableQty) ? 0 : (state.osTabAmt - bidTabAmt);
         state.auctionAvailableQty = FixedPointMathLib.divWad(state.osTabAmt, auctionStep.stepPrice);
         state.auctionPrice = auctionStep.stepPrice;
@@ -183,21 +190,22 @@ contract AuctionManager is AccessControlDefaultAdminRules, ReentrancyGuard {
         if (state.osTabAmt > 0) {
             (, uint256 lastStepTimestamp) = getAuctionPrice(auctionId, block.timestamp);
             det.lastStepTimestamp = lastStepTimestamp;
-        }
+        }  
 
         // transfer reserve BTC to bidder
-        SafeTransferLib.safeTransfer(det.reserve, msg.sender, bidQty);
+        SafeTransferLib.safeTransfer(det.reserve, msg.sender, valueInOriDecimal);
 
-        emit SuccessfulBid(auctionId, msg.sender, auctionStep.stepPrice, bidQty);
+        emit SuccessfulBid(auctionId, msg.sender, auctionStep.stepPrice, valueInDec18);
 
         // update Vault
         SafeTransferLib.safeApprove(det.tab, vaultManagerAddr, bidTabAmt);
-        IVaultManager(vaultManagerAddr).adjustTab(auctionId, bidTabAmt, false);
+        IVaultManager(vaultManagerAddr).paybackTab(auctionId, bidTabAmt);
 
         // auction is completed with leftover reserve, transfer back to Vault
         if (state.reserveQty > 0 && state.auctionAvailableQty == 0 && state.osTabAmt == 0) {
-            SafeTransferLib.safeApprove(det.reserve, vaultManagerAddr, state.reserveQty);
-            IVaultManager(vaultManagerAddr).adjustReserve(auctionId, state.reserveQty, false);
+            (valueInOriDecimal, valueInDec18) = IReserveRegistry(reserveRegistryAddr).getOriReserveAmt(det.reserve, state.reserveQty);
+            SafeTransferLib.safeApprove(det.reserve, vaultManagerAddr, valueInOriDecimal);
+            IVaultManager(vaultManagerAddr).depositReserve(auctionId, valueInDec18);
         }
     }
 

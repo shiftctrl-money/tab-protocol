@@ -43,6 +43,8 @@ interface IPriceOracleManager {
 
     function updateConfig(uint256 _movementDelta, uint256 _inactivePeriod) external;
 
+    function getConfig() external view returns (uint256, uint256, uint256);
+
     function addProvider(
         uint256 blockNum,
         uint256 timestamp,

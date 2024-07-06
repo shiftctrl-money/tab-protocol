@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "../../oracle/interfaces/IPriceOracle.sol";
+
 interface IVaultKeeper {
 
     function riskPenaltyFrameInSecond() external view returns (uint256);
@@ -37,7 +39,7 @@ interface IVaultKeeper {
     }
 
     function isExpiredRiskPenaltyCheck() external view returns (bool);
-    function checkVault(uint256 _timestamp, VaultDetails memory v) external;
+    function checkVault(uint256 _timestamp, VaultDetails calldata v, IPriceOracle.UpdatePriceData calldata sigPrice) external;
     function pushVaultRiskPenalty(address _vaultOwner, uint256 _vaultId) external;
     function pushAllVaultRiskPenalty(uint256 _timestamp) external;
     function isLiquidatingVault(

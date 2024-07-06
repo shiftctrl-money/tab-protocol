@@ -2,6 +2,9 @@
 pragma solidity ^0.8.20;
 
 import { Deployer } from "./Deployer.t.sol";
+import { IGovernanceAction } from "../../contracts/governance/interfaces/IGovernanceAction.sol";
+import { IPriceOracle } from "../../contracts/oracle/interfaces/IPriceOracle.sol";
+import { VaultUtils } from "../../contracts/VaultUtils.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "lib/solady/src/utils/FixedPointMathLib.sol";
 import "forge-std/Test.sol";
@@ -23,6 +26,8 @@ contract VaultKeeperTest is Test, Deployer {
     bytes3 vaultTab;
     uint256 listIndex;
 
+    VaultUtils vaultUtils;
+
     struct VaultDetails {
         address vaultOwner;
         uint256 vaultId;
@@ -39,6 +44,8 @@ contract VaultKeeperTest is Test, Deployer {
         uint256 delta;
         uint256 chargedRP;
     }
+
+    IPriceOracle.UpdatePriceData priceData;
 
     event RiskPenaltyCharged(
         uint256 indexed timestamp,
@@ -59,6 +66,7 @@ contract VaultKeeperTest is Test, Deployer {
 
     function setUp() public {
         test_deploy();
+        vaultUtils = new VaultUtils(address(vaultManager), address(reserveRegistry), address(config));
 
         vaultKeeper.setRiskPenaltyFrameInSecond(10);
         nextBlock(1703753421);
@@ -123,7 +131,7 @@ contract VaultKeeperTest is Test, Deployer {
 
         vm.expectEmit(vaultKeeperAddr);
         emit UpdatedTabParams(_tabs, riskPenaltyPerFrameList);
-        vaultManager.initNewTab(0x555344); // USD
+        IGovernanceAction(governanceActionAddr).createNewTab(0x555344); // USD
 
         vm.expectEmit(vaultKeeperAddr);
         emit UpdatedTabParams(_tabs, riskPenaltyPerFrameList);
@@ -151,7 +159,7 @@ contract VaultKeeperTest is Test, Deployer {
     }
 
     function testCheckVault() public {
-        vaultManager.initNewTab(0x555344); // USD
+        IGovernanceAction(governanceActionAddr).createNewTab(0x555344); // USD
         nextBlock(1);
 
         // skip oracle module (intentionally, for testing), update price directly into PriceOracle
@@ -179,7 +187,7 @@ contract VaultKeeperTest is Test, Deployer {
 
         // create vault
         // current reserve ratio = 25738 / 14298 = 180.01%, just slightly above minimum reserve ratio
-        vaultManager.createVault(reserve_cBTC, 1e18, 0x555344, 14298e18); // max withdrawable = 25738 / 180% =
+        vaultManager.createVault(reserve_cBTC, 1e18, 14298e18, signer.getUpdatePriceSignature(_tabs[0], priceOracle.getPrice(_tabs[0]), block.timestamp)); // max withdrawable = 25738 / 180% =
             // 14298.888888888888888888888888889
         vaultIDs = vaultManager.getAllVaultIDByOwner(eoa_accounts[0]);
         assertEq(vaultIDs[0], 1);
@@ -192,7 +200,7 @@ contract VaultKeeperTest is Test, Deployer {
             uint256 osTab,
             uint256 reserveValue,
             uint256 minReserveValue
-        ) = vaultManager.getVaultDetails(eoa_accounts[0], vaultIDs[0]);
+        ) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultIDs[0], priceOracle.getPrice(0x555344));
         assertEq(reserveKey, keccak256("CBTC"));
         assertEq(price, 25738000000000000000000);
         assertEq(reserveAmt, 1e18);
@@ -209,7 +217,7 @@ contract VaultKeeperTest is Test, Deployer {
         priceOracle.setPrice(_tabs, _prices, _timestamps);
         nextBlock(1);
         assertEq(priceOracle.getPrice(0x555344), 20000e18);
-        (,, price,, osTab, reserveValue, minReserveValue) = vaultManager.getVaultDetails(eoa_accounts[0], vaultIDs[0]);
+        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultIDs[0], priceOracle.getPrice(0x555344));
         assertEq(price, 20000e18);
         assertEq(osTab, 14298e18);
         assertEq(reserveValue, 20000e18);
@@ -218,8 +226,9 @@ contract VaultKeeperTest is Test, Deployer {
         // checkVault
         nextBlock(1);
         console.log("checkVault, block timestamp: ", block.timestamp); // 1703839827
+        priceData = signer.getUpdatePriceSignature(tab, priceOracle.getPrice(tab), block.timestamp);
         bytes memory checkVaultData = abi.encodeWithSignature(
-            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256))",
+            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256),(address,address,bytes3,uint256,uint256,uint8,bytes32,bytes32))",
             block.timestamp,
             eoa_accounts[0],
             vaultIDs[0],
@@ -227,7 +236,8 @@ contract VaultKeeperTest is Test, Deployer {
             reserveKey,
             osTab,
             reserveValue,
-            minReserveValue
+            minReserveValue,
+            priceData
         );
         bytes memory data = Address.functionCall(vaultKeeperAddr, checkVaultData);
         assertEq(data.length, 0);
@@ -242,8 +252,9 @@ contract VaultKeeperTest is Test, Deployer {
 
         // second checkVault: passed RP frame, expect to charge risk penalty
         nextBlock(10); // 1703839827 + 10
+        priceData = signer.getUpdatePriceSignature(tab, priceOracle.getPrice(tab), block.timestamp);
         checkVaultData = abi.encodeWithSignature(
-            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256))",
+            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256),(address,address,bytes3,uint256,uint256,uint8,bytes32,bytes32))",
             block.timestamp,
             eoa_accounts[0],
             vaultIDs[0],
@@ -251,7 +262,8 @@ contract VaultKeeperTest is Test, Deployer {
             reserveKey,
             osTab,
             reserveValue,
-            minReserveValue
+            minReserveValue,
+            priceData
         );
         vm.expectEmit();
         emit RiskPenaltyCharged(
@@ -259,7 +271,7 @@ contract VaultKeeperTest is Test, Deployer {
         );
         data = Address.functionCall(vaultKeeperAddr, checkVaultData);
         assertEq(data.length, 0);
-        (,,,, osTab, reserveValue, minReserveValue) = vaultManager.getVaultDetails(eoa_accounts[0], vaultIDs[0]);
+        (,,,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultIDs[0], priceOracle.getPrice(0x555344));
         assertEq(osTab, 14384046000000000000000); // minted tab 14298e18 + risk penalty charged 86046e15
         assertEq(reserveValue, 20000e18);
         assertEq(minReserveValue, 258912828e14);
@@ -282,9 +294,10 @@ contract VaultKeeperTest is Test, Deployer {
 
         nextBlock(106); // 10 frames passed
         assertEq(data.length, 0);
-        (,,,, osTab, reserveValue, minReserveValue) = vaultManager.getVaultDetails(eoa_accounts[0], vaultIDs[0]);
+        (,,,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultIDs[0], priceOracle.getPrice(0x555344));
+        priceData = signer.getUpdatePriceSignature(tab, priceOracle.getPrice(tab), block.timestamp);
         checkVaultData = abi.encodeWithSignature(
-            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256))",
+            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256),(address,address,bytes3,uint256,uint256,uint8,bytes32,bytes32))",
             block.timestamp, // 1703839837 + 1 + 106 = 1703839944, 1703839944 - 1703839837 = 107 / 10 = 10, 10 * 10 =
                 // 100,
                 // 1703839837 + 100 = 1703839937
@@ -294,7 +307,8 @@ contract VaultKeeperTest is Test, Deployer {
             reserveKey,
             osTab,
             reserveValue,
-            minReserveValue
+            minReserveValue,
+            priceData
         );
         vm.expectEmit(vaultKeeperAddr);
         emit RiskPenaltyCharged(
@@ -304,7 +318,7 @@ contract VaultKeeperTest is Test, Deployer {
         emit StartVaultLiquidation(block.timestamp, eoa_accounts[0], vaultIDs[0], 135755211534000000000);
         data = Address.functionCall(vaultKeeperAddr, checkVaultData);
         assertEq(data.length, 0);
-        (,,,, osTab, reserveValue, minReserveValue) = vaultManager.getVaultDetails(eoa_accounts[0], vaultIDs[0]);
+        (,,,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultIDs[0], priceOracle.getPrice(0x555344));
         assertEq(osTab, 14608170453534000000000); // 14384046000000000000000 + 88369242000000000000 +
             // 135755211534000000000 = 14608170453534000000000
         // assertEq(reserveValue, 17000e18);
@@ -314,8 +328,8 @@ contract VaultKeeperTest is Test, Deployer {
     }
 
     function testCheckVault_2ndLargestVaultDelta_thenLiquidate() public {
-        vaultManager.initNewTab(0x555344); // USD
-        vaultManager.initNewTab(0x4d5952); // MYR
+        IGovernanceAction(governanceActionAddr).createNewTab(0x555344); // USD
+        IGovernanceAction(governanceActionAddr).createNewTab(0x4d5952); // MYR
 
         nextBlock(10);
         // skip oracle module (intentionally, for testing), update price directly into PriceOracle
@@ -345,12 +359,12 @@ contract VaultKeeperTest is Test, Deployer {
 
         // create vault
         // current reserve ratio = 25738 / 14298 = 180.01%, just slightly above minimum reserve ratio
-        vaultManager.createVault(reserve_cBTC, 1e18, 0x555344, 14298e18); // max withdrawable = 25738 / 180% =
+        vaultManager.createVault(reserve_cBTC, 1e18, 14298e18, signer.getUpdatePriceSignature(0x555344, priceOracle.getPrice(0x555344), block.timestamp)); // max withdrawable = 25738 / 180% =
             // 14298.888888888888888888888888889
         vaultIDs = vaultManager.getAllVaultIDByOwner(eoa_accounts[0]);
         assertEq(vaultIDs[0], 1);
 
-        vaultManager.createVault(reserve_cBTC, 1e18, 0x4d5952, 97001910184158850789691); // mint
+        vaultManager.createVault(reserve_cBTC, 1e18, 97001910184158850789691, signer.getUpdatePriceSignature(0x4d5952, priceOracle.getPrice(0x4d5952), block.timestamp)); // mint
             // 97001.910184158850789691
             // sMYR
         vaultIDs = new uint256[](0);
@@ -366,7 +380,7 @@ contract VaultKeeperTest is Test, Deployer {
             uint256 osTab,
             uint256 reserveValue,
             uint256 minReserveValue
-        ) = vaultManager.getVaultDetails(eoa_accounts[0], vaultIDs[0]);
+        ) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultIDs[0], priceOracle.getPrice(_tabs[0]));
         assertEq(keccak256(abi.encodePacked(tab)), keccak256(abi.encodePacked(_tabs[0]))); // USD
         assertEq(reserveKey, keccak256("CBTC"));
         assertEq(price, 25738000000000000000000);
@@ -376,7 +390,7 @@ contract VaultKeeperTest is Test, Deployer {
         assertEq(minReserveValue, 257364e17);
 
         (tab, reserveKey, price, reserveAmt, osTab, reserveValue, minReserveValue) =
-            vaultManager.getVaultDetails(eoa_accounts[0], vaultIDs[1]);
+            vaultUtils.getVaultDetails(eoa_accounts[0], vaultIDs[1], priceOracle.getPrice(_tabs[1]));
         assertEq(keccak256(abi.encodePacked(tab)), keccak256(abi.encodePacked(_tabs[1]))); // MYR
         assertEq(reserveKey, keccak256("CBTC"));
         assertEq(price, 174603438331485931421445);
@@ -397,7 +411,7 @@ contract VaultKeeperTest is Test, Deployer {
         priceOracle.setPrice(_tabs, _prices, _timestamps);
         assertEq(priceOracle.getPrice(0x555344), 20000e18);
 
-        (,, price,, osTab, reserveValue, minReserveValue) = vaultManager.getVaultDetails(eoa_accounts[0], vaultIDs[0]);
+        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultIDs[0], priceOracle.getPrice(0x555344));
         assertEq(price, 20000e18);
         assertEq(osTab, 14298e18);
         assertEq(reserveValue, 20000e18);
@@ -405,8 +419,9 @@ contract VaultKeeperTest is Test, Deployer {
 
         // checkVault
         console.log("checkVault, block timestamp: ", block.timestamp);
+        priceData = signer.getUpdatePriceSignature(_tabs[0], priceOracle.getPrice(_tabs[0]), block.timestamp);
         bytes memory checkVaultData = abi.encodeWithSignature(
-            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256))",
+            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256),(address,address,bytes3,uint256,uint256,uint8,bytes32,bytes32))",
             block.timestamp,
             eoa_accounts[0],
             vaultIDs[0],
@@ -414,7 +429,8 @@ contract VaultKeeperTest is Test, Deployer {
             reserveKey,
             osTab,
             reserveValue,
-            minReserveValue
+            minReserveValue,
+            priceData
         );
         bytes memory data = Address.functionCall(vaultKeeperAddr, checkVaultData);
         assertEq(data.length, 0);
@@ -427,7 +443,7 @@ contract VaultKeeperTest is Test, Deployer {
         assertEq(vaultKeeper.vaultIdList(listIndex), vaultIDs[0]);
         console.log("current checkedTimestamp: ", vaultKeeper.checkedTimestamp());
 
-        (,, price,, osTab, reserveValue, minReserveValue) = vaultManager.getVaultDetails(eoa_accounts[0], vaultIDs[1]);
+        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultIDs[1], priceOracle.getPrice(0x4d5952));
         assertEq(price, 150000e18);
         assertEq(osTab, 97001910184158850789691);
         assertEq(reserveValue, 150000e18);
@@ -435,8 +451,9 @@ contract VaultKeeperTest is Test, Deployer {
             // 24603.438331485931421443
         // delta * 1.5% = to be charged risk penalty 369.051574972288971321645
 
+        priceData = signer.getUpdatePriceSignature(_tabs[1], priceOracle.getPrice(_tabs[1]), block.timestamp);
         checkVaultData = abi.encodeWithSignature(
-            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256))",
+            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256),(address,address,bytes3,uint256,uint256,uint8,bytes32,bytes32))",
             block.timestamp,
             eoa_accounts[0],
             vaultIDs[1],
@@ -444,7 +461,8 @@ contract VaultKeeperTest is Test, Deployer {
             reserveKey,
             osTab,
             reserveValue,
-            minReserveValue
+            minReserveValue,
+            priceData
         );
         data = Address.functionCall(vaultKeeperAddr, checkVaultData);
         assertEq(data.length, 0);
@@ -467,7 +485,7 @@ contract VaultKeeperTest is Test, Deployer {
         assertEq(priceOracle.getPrice(_tabs[0]), 19000e18);
         assertEq(priceOracle.getPrice(_tabs[1]), 155000e18);
 
-        (,, price,, osTab, reserveValue, minReserveValue) = vaultManager.getVaultDetails(eoa_accounts[0], vaultIDs[0]);
+        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultIDs[0], priceOracle.getPrice(0x555344));
         assertEq(price, 19000e18);
         assertEq(osTab, 14298e18);
         assertEq(reserveValue, 19000e18);
@@ -476,8 +494,9 @@ contract VaultKeeperTest is Test, Deployer {
 
         // checkVault
         console.log("checkVault, block timestamp: ", block.timestamp);
+        priceData = signer.getUpdatePriceSignature(_tabs[0], priceOracle.getPrice(_tabs[0]), block.timestamp);
         checkVaultData = abi.encodeWithSignature(
-            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256))",
+            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256),(address,address,bytes3,uint256,uint256,uint8,bytes32,bytes32))",
             block.timestamp,
             eoa_accounts[0],
             vaultIDs[0],
@@ -485,7 +504,8 @@ contract VaultKeeperTest is Test, Deployer {
             reserveKey,
             osTab,
             reserveValue,
-            minReserveValue
+            minReserveValue,
+            priceData
         );
         data = Address.functionCall(vaultKeeperAddr, checkVaultData);
         assertEq(data.length, 0);
@@ -501,7 +521,7 @@ contract VaultKeeperTest is Test, Deployer {
         uint256 usd2ndRunDelta = delta;
 
         nextBlock(1);
-        (,, price,, osTab, reserveValue, minReserveValue) = vaultManager.getVaultDetails(eoa_accounts[0], vaultIDs[1]);
+        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultIDs[1], priceOracle.getPrice(0x4d5952));
         assertEq(price, 155000e18);
         assertEq(osTab, 97001910184158850789691);
         assertEq(reserveValue, 155000e18);
@@ -509,8 +529,9 @@ contract VaultKeeperTest is Test, Deployer {
             // 19603.438331485931421443
         // delta * 1.5% = to be charged risk penalty 294.051574972288971321645
 
+        priceData = signer.getUpdatePriceSignature(_tabs[1], priceOracle.getPrice(_tabs[1]), block.timestamp);
         checkVaultData = abi.encodeWithSignature(
-            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256))",
+            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256),(address,address,bytes3,uint256,uint256,uint8,bytes32,bytes32))",
             block.timestamp,
             eoa_accounts[0],
             vaultIDs[1],
@@ -518,7 +539,8 @@ contract VaultKeeperTest is Test, Deployer {
             reserveKey,
             osTab,
             reserveValue,
-            minReserveValue
+            minReserveValue,
+            priceData
         );
         data = Address.functionCall(vaultKeeperAddr, checkVaultData);
         assertEq(data.length, 0);
@@ -541,7 +563,7 @@ contract VaultKeeperTest is Test, Deployer {
         assertEq(priceOracle.getPrice(_tabs[0]), 15000e18);
         assertEq(priceOracle.getPrice(_tabs[1]), 100000e18);
 
-        (,, price,, osTab, reserveValue, minReserveValue) = vaultManager.getVaultDetails(eoa_accounts[0], vaultIDs[0]);
+        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultIDs[0], priceOracle.getPrice(0x555344));
         assertEq(price, 15000e18);
         assertEq(osTab, 14298e18);
         assertEq(reserveValue, 15000e18);
@@ -549,8 +571,9 @@ contract VaultKeeperTest is Test, Deployer {
 
         // checkVault
         console.log("checkVault, block timestamp: ", block.timestamp);
+        priceData = signer.getUpdatePriceSignature(_tabs[0], priceOracle.getPrice(_tabs[0]), block.timestamp);
         checkVaultData = abi.encodeWithSignature(
-            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256))",
+            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256),(address,address,bytes3,uint256,uint256,uint8,bytes32,bytes32))",
             block.timestamp,
             eoa_accounts[0],
             vaultIDs[0],
@@ -558,7 +581,8 @@ contract VaultKeeperTest is Test, Deployer {
             reserveKey,
             osTab,
             reserveValue,
-            minReserveValue
+            minReserveValue,
+            priceData
         );
         usd2ndRunRiskPenalty = FixedPointMathLib.mulDiv(150, usd2ndRunDelta, 10000);
         usd3rdRunRiskPenalty = FixedPointMathLib.mulDiv(
@@ -577,7 +601,7 @@ contract VaultKeeperTest is Test, Deployer {
         data = Address.functionCall(vaultKeeperAddr, checkVaultData);
         assertEq(data.length, 0);
 
-        (,, price,, osTab, reserveValue, minReserveValue) = vaultManager.getVaultDetails(eoa_accounts[0], vaultIDs[0]);
+        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultIDs[0], priceOracle.getPrice(0x555344));
         assertEq(price, 15000e18);
         assertEq(osTab, 14298e18 + usd2ndRunRiskPenalty + usd3rdRunRiskPenalty);
         // assertEq(reserveValue, 15000e18);
@@ -585,7 +609,7 @@ contract VaultKeeperTest is Test, Deployer {
         assertEq(minReserveValue, FixedPointMathLib.mulDiv(osTab, 180, 100));
 
         nextBlock(1);
-        (,, price,, osTab, reserveValue, minReserveValue) = vaultManager.getVaultDetails(eoa_accounts[0], vaultIDs[1]);
+        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultIDs[1], priceOracle.getPrice(0x4d5952));
         assertEq(price, 100000e18);
         assertEq(osTab, 97001910184158850789691 + myr1stRunRiskPenalty);
         assertEq(reserveValue, 100000e18);
@@ -593,8 +617,9 @@ contract VaultKeeperTest is Test, Deployer {
         delta = minReserveValue - reserveValue;
         console.log("myr delta (3nd run): ", delta);
 
+        priceData = signer.getUpdatePriceSignature(_tabs[1], priceOracle.getPrice(_tabs[1]), block.timestamp);
         checkVaultData = abi.encodeWithSignature(
-            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256))",
+            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256),(address,address,bytes3,uint256,uint256,uint8,bytes32,bytes32))",
             block.timestamp,
             eoa_accounts[0],
             vaultIDs[1],
@@ -602,7 +627,8 @@ contract VaultKeeperTest is Test, Deployer {
             reserveKey,
             osTab,
             reserveValue,
-            minReserveValue
+            minReserveValue,
+            priceData
         );
         vm.expectEmit(vaultKeeperAddr);
         emit StartVaultLiquidation(
@@ -614,7 +640,7 @@ contract VaultKeeperTest is Test, Deployer {
 
     /// @dev selectively clearing risk penalty of a vault
     function testPushVaultRiskPenalty() public {
-        vaultManager.initNewTab(0x555344); // USD
+        IGovernanceAction(governanceActionAddr).createNewTab(0x555344); // USD
 
         // skip oracle module (intentionally, for testing), update price directly into PriceOracle
         _tabs = new bytes3[](1);
@@ -637,7 +663,7 @@ contract VaultKeeperTest is Test, Deployer {
         assertEq(cBTC.allowance(eoa_accounts[0], address(vaultManager)), 1e18);
 
         // create vault
-        vaultManager.createVault(reserve_cBTC, 1e18, 0x555344, 5000e18); // RR 200%
+        vaultManager.createVault(reserve_cBTC, 1e18, 5000e18, signer.getUpdatePriceSignature(0x555344, priceOracle.getPrice(0x555344), block.timestamp)); // RR 200%
 
         vm.stopPrank();
 
@@ -657,7 +683,7 @@ contract VaultKeeperTest is Test, Deployer {
             uint256 osTab,
             uint256 reserveValue,
             uint256 minReserveValue
-        ) = vaultManager.getVaultDetails(eoa_accounts[0], 1);
+        ) = vaultUtils.getVaultDetails(eoa_accounts[0], 1, priceOracle.getPrice(0x555344));
         assertEq(price, 8000e18);
         assertEq(reserveAmt, 1e18);
         assertEq(osTab, 5000e18);
@@ -665,8 +691,9 @@ contract VaultKeeperTest is Test, Deployer {
         assertEq(minReserveValue, 9000e18);
 
         // checkVault - uncleared risk penalty is created
+        priceData = signer.getUpdatePriceSignature(tab, priceOracle.getPrice(tab), block.timestamp);
         bytes memory checkVaultData = abi.encodeWithSignature(
-            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256))",
+            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256),(address,address,bytes3,uint256,uint256,uint8,bytes32,bytes32))",
             block.timestamp,
             eoa_accounts[0],
             1,
@@ -674,7 +701,8 @@ contract VaultKeeperTest is Test, Deployer {
             reserveKey,
             osTab,
             reserveValue,
-            minReserveValue
+            minReserveValue,
+            priceData
         );
         bytes memory data = Address.functionCall(vaultKeeperAddr, checkVaultData);
         assertEq(data.length, 0);
@@ -696,17 +724,19 @@ contract VaultKeeperTest is Test, Deployer {
 
         vm.startPrank(eoa_accounts[0]);
 
+        priceData = signer.getUpdatePriceSignature(0x555344, priceOracle.getPrice(0x555344), block.timestamp);
         vm.expectRevert();
-        vaultManager.adjustTab(1, 555e18, true); // withdrawal more than max. withdraw due to 555e18 did not consider
+        vaultManager.withdrawTab(1, 555e18, priceData); // withdrawal more than max. withdraw due to 555e18 did not consider
             // pending risk penalty to charge
 
+        priceData = signer.getUpdatePriceSignature(0x555344, priceOracle.getPrice(0x555344), block.timestamp);
         vm.expectEmit(vaultManagerAddr);
         emit TabWithdraw(eoa_accounts[0], 1, 540e18, 5540e18);
-        vaultManager.adjustTab(1, 540e18, true); // withdraw tab, max withdraw 5555, deduct os 5555 - 5015 = 540
+        vaultManager.withdrawTab(1, 540e18, priceData); // withdraw tab, max withdraw 5555, deduct os 5555 - 5015 = 540
 
         vm.stopPrank();
 
-        (,, price,, osTab, reserveValue, minReserveValue) = vaultManager.getVaultDetails(eoa_accounts[0], 1);
+        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], 1, priceOracle.getPrice(0x555344));
         assertEq(price, 10000e18);
         assertEq(osTab, 5555e18);
         assertEq(reserveValue, 10000e18);

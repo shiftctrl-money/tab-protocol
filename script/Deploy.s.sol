@@ -16,6 +16,7 @@ import "../contracts/governance/ShiftCtrlEmergencyGovernor.sol";
 import "../contracts/governance/interfaces/IGovernanceAction.sol";
 import "../contracts/governance/GovernanceAction.sol";
 import "../contracts/VaultManager.sol";
+import "../contracts/VaultUtils.sol";
 import "../contracts/TabRegistry.sol";
 import "../contracts/TabFactory.sol";
 import "../contracts/AuctionManager.sol";
@@ -57,6 +58,7 @@ contract Deploy is Script {
     address emergencyTimelockController;
     address governanceAction;
     address vaultManager;
+    address vaultUtils;
     address tabRegistry;
     address tabFactory;
     address auctionManager;
@@ -137,7 +139,7 @@ contract Deploy is Script {
 
         // Given same deployer address, expected TabFactory to be deployed on same address in EVM chains
         // Tab addresses created from TabFactory are expected to be consistent on EVM chains
-        // Expect TabFactory address: 0xc8a5B8773CE13AAf0ac994C8827a3692C5F61Aba
+        // Expect TabFactory address: 0x99eff83A66284459946Ff36E4c8eAa92f07d6782 by deployer 0xF9D253eB19B5c929fcF8B28a9B34Aaba61dB3F56
         tabFactory = ISkybitCreate3Factory(skybitCreate3Factory).deploy(
             keccak256(abi.encodePacked("shiftCTRL TabFactory_v1")), 
             abi.encodePacked(type(TabFactory).creationCode, abi.encode(governanceTimelockController, tabRegistry))
@@ -146,19 +148,22 @@ contract Deploy is Script {
         TabRegistry(tabRegistry).setTabFactory(tabFactory);
         console.log("TabFactory: ", tabFactory);
 
-        auctionManager = address(new AuctionManager(governanceTimelockController, emergencyTimelockController, vaultManager));
-        console.log("AuctionManager: ", auctionManager);
-
-        config = address(new Config(governanceTimelockController, emergencyTimelockController, governanceAction, deployer, TREASURY, tabRegistry, auctionManager));
-        TabRegistry(tabRegistry).setConfigAddress(config);
-        console.log("Config: ", config);
-
         reserveRegistry = address(new ReserveRegistry(governanceTimelockController, emergencyTimelockController, governanceAction, deployer));
         console.log("ReserveRegistry: ", reserveRegistry);
 
         reserveSafe = address(new ReserveSafe(governanceTimelockController, emergencyTimelockController, vaultManager, cBTC));
         ReserveRegistry(reserveRegistry).addReserve(reserve_cBTC, cBTC, reserveSafe);
         console.log("ReserveSafe: ", reserveSafe);
+
+        auctionManager = address(new AuctionManager(governanceTimelockController, emergencyTimelockController, vaultManager, reserveRegistry));
+        console.log("AuctionManager: ", auctionManager);
+
+        config = address(new Config(governanceTimelockController, emergencyTimelockController, governanceAction, deployer, TREASURY, tabRegistry, auctionManager));
+        TabRegistry(tabRegistry).setConfigAddress(config);
+        console.log("Config: ", config);
+
+        vaultUtils = address(new VaultUtils(vaultManager, reserveRegistry, config));
+        console.log("VaultUtils: ", vaultUtils);
 
         priceOracleManager = deployPriceOracleManager(governanceTimelockController, emergencyTimelockController, governanceAction, deployer, tabRegistry, tabProxyAdmin);
         console.log("PriceOracleManager: ", priceOracleManager);
@@ -190,7 +195,7 @@ contract Deploy is Script {
         Config(config).setReserveParams(reserve, processFeeRate, minReserveRatio, liquidationRatio);
 
         // DEPLOY IN FUTURE BASED ON GOVERNANCE DECISION
-        // protocolVault = deployProtocolVault(deployer, vaultManager, tabProxyAdmin);
+        // protocolVault = deployProtocolVault(deployer, vaultManager, reserveRegistry, tabProxyAdmin);
         // TabRegistry(tabRegistry).setProtocolVaultAddress(protocolVault);
         // AccessControlInterface(tabRegistry.tabs(tab10[i])).grantRole(MINTER_ROLE, protocolVaultAddr);
         // console.log("ProtocolVault: ", protocolVault);
@@ -204,6 +209,7 @@ contract Deploy is Script {
         CTRL(ctrl).grantRole(keccak256("UPGRADER_ROLE"), emergencyTimelockController);
         CTRL(ctrl).beginDefaultAdminTransfer(governanceTimelockController);
             // governance to call acceptDefaultAdminTransfer
+            // governance to call TabRegistry(tabRegistry).grantRole(USER_ROLE, UI_USER);
 
         vm.stopBroadcast();
     }
@@ -234,7 +240,7 @@ contract Deploy is Script {
 
     function deployVaultManager(address _governanceTimelockController, address _emergencyTimelockController, address _deployer, address _tabProxyAdmin) internal returns(address) {
         bytes memory vaultManagerInitData =
-            abi.encodeWithSignature("initialize(address,address,address,address)", _governanceTimelockController, _emergencyTimelockController, _deployer, UI_USER);
+            abi.encodeWithSignature("initialize(address,address,address)", _governanceTimelockController, _emergencyTimelockController, _deployer);
         VaultManager vaultManagerImpl = new VaultManager(); // implementation
         return address(
             new TransparentUpgradeableProxy(address(vaultManagerImpl), _tabProxyAdmin, vaultManagerInitData)

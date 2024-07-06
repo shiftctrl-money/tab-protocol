@@ -1,68 +1,54 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-contract WBTC {
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlDefaultAdminRulesUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-    function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        require((z = x + y) >= x, "ds-math-add-overflow");
+contract WBTC is
+    Initializable,
+    ERC20Upgradeable,
+    ERC20BurnableUpgradeable,
+    AccessControlDefaultAdminRulesUpgradeable,
+    ERC20PermitUpgradeable,
+    UUPSUpgradeable
+{
+
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
     }
 
-    function sub(uint256 x, uint256 y) internal pure returns (uint256 z) {
-        require((z = x - y) <= x, "ds-math-sub-underflow");
+    function initialize(address _admin, address _admin2, address _deployer) public initializer {
+        // Refer https://etherscan.io/token/0x2260fac5e5542a773aa44fbcfedf7c193bc2c599
+        // Create this in testnet for testing purpose only - mint and lock as vault reserve
+        __ERC20_init("Token Wrapped BTC", "WBTC");
+        __ERC20Burnable_init();
+        __AccessControlDefaultAdminRules_init(1 days, _admin);
+        __ERC20Permit_init("Token Wrapped BTC");
+        __UUPSUpgradeable_init();
+
+        _grantRole(UPGRADER_ROLE, _admin);
+        _grantRole(UPGRADER_ROLE, _admin2);
+
+        _grantRole(MINTER_ROLE, _deployer);
     }
 
-    event Approval(address indexed src, address indexed guy, uint256 wad);
-    event Transfer(address indexed src, address indexed dst, uint256 wad);
-
-    string public name = "WBTC";
-    string public symbol = "WBTC";
-    uint256 public decimals = 8;
-    uint256 _supply;
-    mapping(address => uint256) _balances;
-    mapping(address => mapping(address => uint256)) _approvals;
-
-    constructor(uint256 supply) {
-        _balances[msg.sender] = supply;
-        _supply = supply;
+    function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
+        _mint(to, amount);
     }
 
-    function totalSupply() public view returns (uint256) {
-        return _supply;
-    }
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) { }
 
-    function balanceOf(address src) public view returns (uint256) {
-        return _balances[src];
-    }
-
-    function allowance(address src, address guy) public view returns (uint256) {
-        return _approvals[src][guy];
-    }
-
-    function transfer(address dst, uint256 wad) public returns (bool) {
-        return transferFrom(msg.sender, dst, wad);
-    }
-
-    function transferFrom(address src, address dst, uint256 wad) public returns (bool) {
-        if (src != msg.sender) {
-            require(_approvals[src][msg.sender] >= wad, "insufficient-approval");
-            _approvals[src][msg.sender] = sub(_approvals[src][msg.sender], wad);
-        }
-
-        require(_balances[src] >= wad, "insufficient-balance");
-        _balances[src] = sub(_balances[src], wad);
-        _balances[dst] = add(_balances[dst], wad);
-
-        emit Transfer(src, dst, wad);
-
-        return true;
-    }
-
-    function approve(address guy, uint256 wad) public returns (bool) {
-        _approvals[msg.sender][guy] = wad;
-
-        emit Approval(msg.sender, guy, wad);
-
-        return true;
+    // @dev Follow actual WBTC decimal value
+    function decimals() public view virtual override returns (uint8) {
+        return 8;
     }
 
 }

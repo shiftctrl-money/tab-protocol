@@ -17,6 +17,7 @@ import "../contracts/governance/ShiftCtrlEmergencyGovernor.sol";
 import "../contracts/governance/interfaces/IGovernanceAction.sol";
 import "../contracts/governance/GovernanceAction.sol";
 import "../contracts/VaultManager.sol";
+import "../contracts/VaultUtils.sol";
 import "../contracts/TabRegistry.sol";
 import "../contracts/TabFactory.sol";
 import "../contracts/AuctionManager.sol";
@@ -28,7 +29,7 @@ import "../contracts/oracle/interfaces/IPriceOracleManager.sol";
 import "../contracts/oracle/PriceOracleManager.sol";
 import "../contracts/VaultKeeper.sol";
 import "../contracts/ProtocolVault.sol";
-import "../test/foundry/helper/RateSimulator.sol";
+// import "../test/foundry/helper/RateSimulator.sol";
 
 // https://www.0xdev.co/how-to-write-scripts-in-solidity-using-foundry/
 // FOR LOCAL TEST ONLY
@@ -71,6 +72,7 @@ contract Deploy is Script {
     address priceOracle;
     address vaultKeeper;
     address protocolVault;
+    address vaultUtils;
 
     // cast wallet new
     address[] providers = [
@@ -160,29 +162,22 @@ contract Deploy is Script {
         vaultManager = deployVaultManager(deployer, deployer, deployer, tabProxyAdmin);
         console.log("VaultManager: ", vaultManager);
 
-        tabRegistry = address(new TabRegistry(deployer, deployer, deployer, deployer, deployer, vaultManager, tabProxyAdmin));
+        tabRegistry = address(new TabRegistry(deployer, deployer, deployer, deployer, KEEPER_RELAYER, vaultManager, tabProxyAdmin));
         console.log("TabRegistry: ", tabRegistry);
         TabRegistry(tabRegistry).setGovernanceAction(governanceAction);
 
-        // tabFactory = address(new TabFactory(deployer, tabRegistry));
+        tabFactory = address(new TabFactory(deployer, tabRegistry));
         
         // Given same deployer address, expected TabFactory to be deployed on same address in EVM chains
         // Tab addresses created from TabFactory are expected to be consistent on EVM chains
         // Expect TabFactory address: 0xc8a5B8773CE13AAf0ac994C8827a3692C5F61Aba
-        tabFactory = ISkybitCreate3Factory(skybitCreate3Factory).deploy(
-            keccak256(abi.encodePacked("shiftCTRL TabFactory_v1")), 
-            abi.encodePacked(type(TabFactory).creationCode, abi.encode(deployer, tabRegistry))
-        );
+        // tabFactory = ISkybitCreate3Factory(skybitCreate3Factory).deploy(
+        //     keccak256(abi.encodePacked("shiftCTRL TabFactory_v1")), 
+        //     abi.encodePacked(type(TabFactory).creationCode, abi.encode(deployer, tabRegistry))
+        // );
 
         TabRegistry(tabRegistry).setTabFactory(tabFactory);
         console.log("TabFactory: ", address(tabFactory));
-
-        auctionManager = address(new AuctionManager(deployer, deployer, vaultManager));
-        console.log("AuctionManager: ", auctionManager);
-
-        config = address(new Config(deployer, deployer, deployer, deployer, TREASURY, tabRegistry, auctionManager));
-        TabRegistry(tabRegistry).setConfigAddress(config);
-        console.log("Config: ", config);
 
         reserveRegistry = address(new ReserveRegistry(deployer, deployer, deployer, deployer));
         console.log("ReserveRegistry: ", reserveRegistry);
@@ -190,6 +185,16 @@ contract Deploy is Script {
         reserveSafe = address(new ReserveSafe(deployer, deployer, vaultManager, cBTC));
         ReserveRegistry(reserveRegistry).addReserve(reserve_cBTC, cBTC, reserveSafe);
         console.log("ReserveSafe: ", reserveSafe);
+
+        auctionManager = address(new AuctionManager(deployer, deployer, vaultManager, reserveRegistry));
+        console.log("AuctionManager: ", auctionManager);
+
+        config = address(new Config(deployer, deployer, deployer, deployer, TREASURY, tabRegistry, auctionManager));
+        TabRegistry(tabRegistry).setConfigAddress(config);
+        console.log("Config: ", config);
+
+        vaultUtils = address(new VaultUtils(vaultManager, reserveRegistry, config));
+        console.log("VaultUtils: ", vaultUtils);
 
         priceOracleManager = deployPriceOracleManager(deployer, deployer, governanceAction, deployer, tabRegistry, tabProxyAdmin);
         console.log("PriceOracleManager: ", priceOracleManager);
@@ -258,7 +263,7 @@ contract Deploy is Script {
 
     function deployVaultManager(address _governanceTimelockController, address _emergencyTimelockController, address _deployer, address _tabProxyAdmin) internal returns(address) {
         bytes memory vaultManagerInitData =
-            abi.encodeWithSignature("initialize(address,address,address,address)", _governanceTimelockController, _emergencyTimelockController, _deployer, _deployer);
+            abi.encodeWithSignature("initialize(address,address,address)", _governanceTimelockController, _emergencyTimelockController, _deployer);
         VaultManager vaultManagerImpl = new VaultManager(); // implementation
         return address(
             new TransparentUpgradeableProxy(address(vaultManagerImpl), _tabProxyAdmin, vaultManagerInitData)
@@ -274,7 +279,7 @@ contract Deploy is Script {
         address _tabProxyAdmin
     ) internal returns(address) {
         bytes memory priceOracleManagerInitData = abi.encodeWithSignature(
-            "initialize(address,address,address,address,address,address)", _governanceTimelockController, _emergencyTimelockController, _governanceAction, _deployer, _deployer, _tabRegistry
+            "initialize(address,address,address,address,address,address)", _governanceTimelockController, _emergencyTimelockController, _governanceAction, _deployer, PRICE_RELAYER, _tabRegistry
         );
         PriceOracleManager priceOracleManagerImpl = new PriceOracleManager(); // implementation
         return address(
@@ -284,7 +289,7 @@ contract Deploy is Script {
 
     function deployVaultKeeper(address _governanceTimelockController, address _emergencyTimelockController, address _deployer, address _vaultManager, address _config, address _tabProxyAdmin) internal returns(address) {
         bytes memory vaultKeeperInitData = abi.encodeWithSignature(
-            "initialize(address,address,address,address,address,address)", _governanceTimelockController, _emergencyTimelockController, _deployer, _deployer, _vaultManager, _config
+            "initialize(address,address,address,address,address,address)", _governanceTimelockController, _emergencyTimelockController, _deployer, KEEPER_RELAYER, _vaultManager, _config
         );
         VaultKeeper vaultKeeperImpl = new VaultKeeper(); // implementation
         return address(
@@ -343,8 +348,8 @@ contract Deploy is Script {
         PriceOracle(priceOracle).setDirectPrice(sUSD, 37086793778438155432848, block.timestamp);
         PriceOracle(priceOracle).setDirectPrice(sMYR, 174603438331485931421445, block.timestamp);
         
-        VaultManager(vaultManager).createVault(reserve_cBTC, 1e18, sUSD, 1e18);
-        VaultManager(vaultManager).createVault(reserve_cBTC, 1e18, sMYR, 1e18);
+        // VaultManager(vaultManager).createVault(reserve_cBTC, 1e18, sUSD, 1e18);
+        // VaultManager(vaultManager).createVault(reserve_cBTC, 1e18, sMYR, 1e18);
 
         bytes memory grantRoleData = abi.encodeWithSignature(
             "grantRole(bytes32,address)",

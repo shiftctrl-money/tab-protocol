@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import { Deployer } from "./Deployer.t.sol";
 import { TabERC20 } from "../../contracts/token/TabERC20.sol";
 import { IGovernanceAction } from "../../contracts/governance/interfaces/IGovernanceAction.sol";
+import { IPriceOracle } from "../../contracts/oracle/interfaces/IPriceOracle.sol";
 import { IConfig } from "../../contracts/shared/interfaces/IConfig.sol";
 
 contract CoreTest is Test, Deployer {
@@ -33,6 +34,7 @@ contract CoreTest is Test, Deployer {
     );
 
     bytes32 private res_cBTC = keccak256("CBTC");
+    IPriceOracle.UpdatePriceData priceData;
 
     function setUp() public {
         test_deploy();
@@ -181,10 +183,10 @@ contract CoreTest is Test, Deployer {
         assertEq(cBTC.allowance(eoa_accounts[0], address(vaultManager)), 10e18);
 
         // sample row 7 : deposit 1 BTC, mint 10000 sUSD
+        priceData = signer.getUpdatePriceSignature(0x555344, _prices[0], _timestamps[0]);
         vm.expectEmit(true, false, false, false);
-        emit NewVault(1, owner, address(cBTC), 1e18, address(0), 10000e18); // tab address is unknown at this point
-            // (before createVault)
-        vaultManager.createVault(res_cBTC, 1e18, 0x555344, 10000e18);
+        emit NewVault(1, owner, address(cBTC), 1e18, address(0), 10000e18);
+        vaultManager.createVault(res_cBTC, 1e18, 10000e18, priceData);
 
         address sUSDAddr = tabRegistry.tabs(0x555344);
         TabERC20 sUSD = TabERC20(sUSDAddr);
@@ -205,9 +207,10 @@ contract CoreTest is Test, Deployer {
         assertEq(pendingOsMint, 0);
 
         // sample row 8 : mint additional 3000 sUSD
+        priceData = signer.getUpdatePriceSignature(0x555344, priceOracle.getPrice(0x555344), block.timestamp);
         vm.expectEmit(true, true, false, true);
         emit TabWithdraw(eoa_accounts[0], 1, 3000e18, 13000e18);
-        vaultManager.adjustTab(1, 3000e18, true);
+        vaultManager.withdrawTab(1, 3000e18, priceData);
         assertEq(sUSD.balanceOf(eoa_accounts[0]), 13000e18);
         (reserveAddr, reserveAmt, tab, tabAmt, osTabAmt, pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 1);
         assertEq(tabAmt, 13000e18);
@@ -289,7 +292,7 @@ contract CoreTest is Test, Deployer {
         vm.prank(eoa_accounts[0]);
         vm.expectEmit(true, true, false, true);
         emit ReserveAdded(eoa_accounts[0], 1, 5e17, 1e18 + 5e17);
-        vaultManager.adjustReserve(1, 5e17, false);
+        vaultManager.depositReserve(1, 5e17);
         (reserveAddr, reserveAmt, tab, tabAmt, osTabAmt, pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 1);
         assertEq(reserveAddr, address(cBTC));
         assertEq(reserveAmt, 15e17);
@@ -310,7 +313,7 @@ contract CoreTest is Test, Deployer {
         vm.prank(eoa_accounts[0]);
         vm.expectEmit(true, true, false, true);
         emit TabReturned(eoa_accounts[0], 1, osToBeMinted, 13000e18);
-        vaultManager.adjustTab(1, osToBeMinted, false);
+        vaultManager.paybackTab(1, osToBeMinted);
         (reserveAddr, reserveAmt, tab, tabAmt, osTabAmt, pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 1);
         assertEq(tabAmt, 13000e18);
         assertEq(osTabAmt, 0); // no more OS
@@ -334,7 +337,7 @@ contract CoreTest is Test, Deployer {
         vm.prank(eoa_accounts[0]);
         vm.expectEmit(true, true, false, true);
         emit TabReturned(eoa_accounts[0], 1, 5000e18, 13000e18 - (5000e18 - 18761e16));
-        vaultManager.adjustTab(1, 5000e18, false);
+        vaultManager.paybackTab(1, 5000e18);
         (reserveAddr, reserveAmt, tab, tabAmt, osTabAmt, pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 1);
         assertEq(tabAmt, 13000e18 - (5000e18 - 18761e16));
         assertEq(osTabAmt, 0);
