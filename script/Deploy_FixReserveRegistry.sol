@@ -49,8 +49,10 @@ contract FixReserveRegistry is Script {
         // reserve registry
         reserveRegistry = address(new ReserveRegistry(governanceTimelockController, emergencyTimelockController, governanceAction, deployer));
         console.log("ReserveRegistry: ", reserveRegistry);
-        ReserveRegistry(reserveRegistry).addReserve(reserve_WBTC, cBTC, reserveSafeCBTC);
-        ReserveRegistry(reserveRegistry).addReserve(reserve_CBTC, wBTC, reserveSafeWBTC);
+        // ReserveRegistry(reserveRegistry).addReserve(reserve_WBTC, cBTC, reserveSafeCBTC);
+        // ReserveRegistry(reserveRegistry).addReserve(reserve_CBTC, wBTC, reserveSafeWBTC);
+        ReserveRegistry(reserveRegistry).addReserve(reserve_WBTC, wBTC, reserveSafeWBTC);
+        ReserveRegistry(reserveRegistry).addReserve(reserve_CBTC, cBTC, reserveSafeCBTC);
         
         VaultUtils(vaultUtils).setContractAddress(vaultManager, reserveRegistry, config);
         VaultManager(vaultManager).configContractAddress(
