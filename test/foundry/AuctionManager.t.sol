@@ -411,9 +411,12 @@ contract AuctionManagerTest is Test, Deployer {
         vm.expectRevert("INVALID_BID_QTY");
         IAuctionManager(auctionManagerAddr).bid(vaultIDs[0], 0);
 
-        vm.expectRevert("INVALID_AUCTION_ID");
         (reserveQty, auctionAvailableQty, osTabAmt, auctionPrice) =
             IAuctionManager(auctionManagerAddr).getAuctionState(10);
+        assertEq(reserveQty, 0);
+        assertEq(auctionAvailableQty, 0);
+        assertEq(osTabAmt, 0);
+        assertEq(auctionPrice, 0);
 
         vm.expectRevert("INVALID_AUCTION_ID");
         (auctionStep, lastStepTimestamp) = IAuctionManager(auctionManagerAddr).getAuctionPrice(10, block.timestamp);

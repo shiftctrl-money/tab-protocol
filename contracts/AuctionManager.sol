@@ -211,7 +211,8 @@ contract AuctionManager is AccessControlDefaultAdminRules, ReentrancyGuard {
 
     function getAuctionState(uint256 auctionId) external view returns (AuctionState memory state) {
         state = auctionState[auctionId];
-        require(state.auctionPrice > 0, "INVALID_AUCTION_ID");
+        if (state.auctionPrice == 0) // auction is not found, vault is not liquidated
+            return state;
 
         (AuctionStep memory auctionStep,) = getAuctionPrice(auctionId, block.timestamp);
 

@@ -49,7 +49,7 @@ Please refer to deployed smart contract addresses below:
 |VaultUtils                                 |[0xd84E8dfD237D4c8ab47B2291441b1d4826EBDf01](https://sepolia.arbiscan.io/address/0xd84E8dfD237D4c8ab47B2291441b1d4826EBDf01)|
 |TabRegistry								|[0x5B2949601CDD3721FF11bF55419F427c9C118e2c](https://sepolia.arbiscan.io/address/0x5B2949601CDD3721FF11bF55419F427c9C118e2c)|
 |TabFactory									|[0x99eff83A66284459946Ff36E4c8eAa92f07d6782](https://sepolia.arbiscan.io/address/0x99eff83A66284459946Ff36E4c8eAa92f07d6782)|
-|AuctionManager								|[0xAD8Cb0f17B8547Acb621d30a30add11fdb0F0a0F](https://sepolia.arbiscan.io/address/0xAD8Cb0f17B8547Acb621d30a30add11fdb0F0a0F)|
+|AuctionManager								|[0x66bC50E59Ccb8d1775C73A69a252Ce43b7d047A8](https://sepolia.arbiscan.io/address/0x66bC50E59Ccb8d1775C73A69a252Ce43b7d047A8)|
 |Config										|[0x1a13d6a511A9551eC1A493C26362836e80aC4d65](https://sepolia.arbiscan.io/address/0x1a13d6a511A9551eC1A493C26362836e80aC4d65)|
 |ReserveRegistry							|[0x2A4Dc0e2Ff4210ec81b14eC97CE3fB755824B0C7](https://sepolia.arbiscan.io/address/0x2A4Dc0e2Ff4210ec81b14eC97CE3fB755824B0C7)|
 |ReserveSafe (WBTC)							|[0xEc0e4922F4427b06475A5fd3ec729467BbaB8de3](https://sepolia.arbiscan.io/address/0xEc0e4922F4427b06475A5fd3ec729467BbaB8de3)|
