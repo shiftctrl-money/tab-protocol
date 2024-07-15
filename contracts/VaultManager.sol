@@ -345,7 +345,6 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
                 revert InvalidVault(_vaultOwner, _vaultId);
             }
         } else {
-            require(_reserveAmt <= v.reserveAmt, "EXCEED_RESERVE");
             require(ITabRegistry(tabRegistry).frozenTabs(ITabERC20(v.tab).tabCode()) == false, "FROZEN_TAB");
             vaultKeeper.pushVaultRiskPenalty(_vaultOwner, _vaultId);
         }
