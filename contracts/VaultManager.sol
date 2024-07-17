@@ -185,6 +185,7 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
         emit NewVault(vaultId, _vaultOwner, reserveAddr, _reserveAmt, tab, _tabAmt);
     }
 
+    /// @dev mint tabs
     function withdrawTab(
         uint256 _vaultId, 
         uint256 _tabAmt, 
