@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlDefaultAdminRulesUpgradeable.sol";
 import "lib/solady/src/utils/FixedPointMathLib.sol";
+import "./oracle/interfaces/IPriceOracle.sol";
 import "./shared/interfaces/IVaultManager.sol";
 
 contract VaultKeeper is Initializable, AccessControlDefaultAdminRulesUpgradeable, UUPSUpgradeable {
@@ -184,7 +185,7 @@ contract VaultKeeper is Initializable, AccessControlDefaultAdminRulesUpgradeable
      * If 120 < Reserve Ratio < 180 , calculate risk penalty
      * If Reserve Ratio < 120 , emit VaultLiquidation
      */
-    function checkVault(uint256 _timestamp, VaultDetails memory v) external onlyRole(EXECUTOR_ROLE) {
+    function checkVault(uint256 _timestamp, VaultDetails calldata v, IPriceOracle.UpdatePriceData calldata sigPrice) external onlyRole(EXECUTOR_ROLE) {
         require(_timestamp >= checkedTimestamp, "OUTDATED_TIMESTAMP");
         require(v.reserveValue < v.minReserveValue, "NO_DELTA");
 
@@ -217,7 +218,7 @@ contract VaultKeeper is Initializable, AccessControlDefaultAdminRulesUpgradeable
 
             emit StartVaultLiquidation(_timestamp, v.vaultOwner, v.vaultId, riskPenalty);
             emit RiskPenaltyCharged(_timestamp, v.vaultOwner, v.vaultId, reserveDelta, riskPenalty);
-            IVaultManager(vaultManager).liquidateVault(v.vaultOwner, v.vaultId, riskPenalty);
+            IVaultManager(vaultManager).liquidateVault(v.vaultOwner, v.vaultId, riskPenalty, sigPrice);
         } else {
             if (largestVaultDelta[v.vaultOwner][v.vaultId] > 0) {
                 if (reserveDelta > largestVaultDelta[v.vaultOwner][v.vaultId]) {

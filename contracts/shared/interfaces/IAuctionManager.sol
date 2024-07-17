@@ -5,6 +5,8 @@ interface IAuctionManager {
 
     function vaultManagerAddr() external view returns (address);
 
+    function reserveRegistryAddr() external view returns (address);
+
     function auctionDetails(uint256)
         external
         view
@@ -37,7 +39,7 @@ interface IAuctionManager {
 
     function auctionVaultIds(uint256) external view returns (uint256);
 
-    function setVaultManager(address) external;
+    function setContractAddr(address,address) external;
 
     function setMaxStep(uint256) external;
 

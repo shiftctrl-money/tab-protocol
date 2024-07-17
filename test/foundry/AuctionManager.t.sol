@@ -3,10 +3,12 @@ pragma solidity ^0.8.20;
 
 import { Deployer } from "./Deployer.t.sol";
 import { IAuctionManager } from "../../contracts/shared/interfaces/IAuctionManager.sol";
+import { IPriceOracle } from "../../contracts/oracle/interfaces/IPriceOracle.sol";
 import { IConfig } from "../../contracts/shared/interfaces/IConfig.sol";
 import { IGovernanceAction } from "../../contracts/governance/interfaces/IGovernanceAction.sol";
 import { TabERC20 } from "../../contracts/token/TabERC20.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
+import { VaultUtils } from "../../contracts/VaultUtils.sol";
+import { Address } from "@openzeppelin/contracts/utils/Address.sol";
 import "lib/solady/src/utils/FixedPointMathLib.sol";
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
@@ -31,6 +33,8 @@ contract AuctionManagerTest is Test, Deployer {
     uint256 startTime;
     uint256 auctionStepDurationInSec;
 
+    VaultUtils vaultUtils;
+
     // getVaultDetails
     bytes3 tabCode;
     bytes32 resKey;
@@ -40,7 +44,7 @@ contract AuctionManagerTest is Test, Deployer {
     uint256 reserveValue;
     uint256 minReserveValue;
 
-    event UpdatedVaultManager(address oldAddr, address newAddr);
+    event UpdatedContractAddr(address oldVMAddr, address newVMAddr, address oldRRAddr, address newRRAddr);
     event ActiveAuction(
         uint256 indexed auctionId,
         address reserve,
@@ -58,10 +62,11 @@ contract AuctionManagerTest is Test, Deployer {
 
     function setUp() public {
         test_deploy();
+        vaultUtils = new VaultUtils(address(vaultManager), address(reserveRegistry), address(config));
 
         vaultKeeper.setRiskPenaltyFrameInSecond(10);
 
-        vaultManager.initNewTab(0x555344); // USD
+        tabRegistry.createTab(0x555344); // USD
         _tabs = new bytes3[](1);
         _tabs[0] = 0x555344; // USD
         _prices = new uint256[](1);
@@ -77,11 +82,11 @@ contract AuctionManagerTest is Test, Deployer {
 
         vm.startPrank(eoa_accounts[0]);
         cBTC.approve(address(vaultManager), 6e18);
-        vaultManager.createVault(reserve_cBTC, 6e18, 0x555344, 54000e18);
+        vaultManager.createVault(reserve_cBTC, 6e18, 54000e18, signer.getUpdatePriceSignature(_tabs[0], _prices[0], _timestamps[0]));
         vaultIDs = vaultManager.getAllVaultIDByOwner(eoa_accounts[0]);
         assertEq(vaultIDs[0], 1);
         (tabCode, resKey, price, reserveAmt, osTab, reserveValue, minReserveValue) =
-            vaultManager.getVaultDetails(eoa_accounts[0], vaultIDs[0]);
+            vaultUtils.getVaultDetails(eoa_accounts[0], vaultIDs[0], priceOracle.getPrice(0x555344));
         assertEq(resKey, keccak256("CBTC"));
         assertEq(price, 20000e18);
         assertEq(reserveAmt, 6e18);
@@ -93,7 +98,7 @@ contract AuctionManagerTest is Test, Deployer {
         // create another vault to get sUSD for bidding
         vm.startPrank(eoa_accounts[9]);
         cBTC.approve(address(vaultManager), 10e18);
-        vaultManager.createVault(reserve_cBTC, 10e18, 0x555344, 60000e18);
+        vaultManager.createVault(reserve_cBTC, 10e18, 60000e18, signer.getUpdatePriceSignature(_tabs[0], _prices[0], _timestamps[0]));
         vm.stopPrank();
 
         // price dropped and keeper's checkVault triggered liquidation
@@ -108,7 +113,7 @@ contract AuctionManagerTest is Test, Deployer {
         _timestamps[0] = block.timestamp;
         priceOracle.setPrice(_tabs, _prices, _timestamps);
         bytes memory checkVaultData = abi.encodeWithSignature(
-            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256))",
+            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256),(address,address,bytes3,uint256,uint256,uint8,bytes32,bytes32))",
             block.timestamp,
             eoa_accounts[0],
             vaultIDs[0],
@@ -116,7 +121,8 @@ contract AuctionManagerTest is Test, Deployer {
             reserve_cBTC,
             54000e18,
             6e18,
-            FixedPointMathLib.mulDiv(54000e18, 180, 100)
+            FixedPointMathLib.mulDiv(54000e18, 180, 100),
+            signer.getUpdatePriceSignature(_tabs[0], _prices[0], _timestamps[0])
         );
         startTime = block.timestamp;
         vm.expectEmit(auctionManagerAddr);
@@ -148,11 +154,12 @@ contract AuctionManagerTest is Test, Deployer {
         vm.warp(block.timestamp + increment);
     }
 
-    function testSetVaultManager() public {
+    function testSetContractAddress() public {
         vm.expectEmit(auctionManagerAddr);
-        emit UpdatedVaultManager(vaultManagerAddr, address(10));
-        IAuctionManager(auctionManagerAddr).setVaultManager(address(10));
+        emit UpdatedContractAddr(vaultManagerAddr, address(10), address(reserveRegistry), address(11));
+        IAuctionManager(auctionManagerAddr).setContractAddr(address(10), address(11));
         assertEq(IAuctionManager(auctionManagerAddr).vaultManagerAddr(), address(10));
+        assertEq(IAuctionManager(auctionManagerAddr).reserveRegistryAddr(), address(11));
     }
 
     function testSetMaxStep() public {
@@ -298,7 +305,7 @@ contract AuctionManagerTest is Test, Deployer {
         vm.stopPrank();
 
         (tabCode, resKey, price, reserveAmt, osTab, reserveValue, minReserveValue) =
-            vaultManager.getVaultDetails(eoa_accounts[0], vaultIDs[0]);
+            vaultUtils.getVaultDetails(eoa_accounts[0], vaultIDs[0], priceOracle.getPrice(0x555344));
         assertEq(reserveAmt, 0);
         assertEq(osTab, 0);
         assertEq(reserveValue, 0);
@@ -308,7 +315,7 @@ contract AuctionManagerTest is Test, Deployer {
         // expect revert: non-owner try to access liquidated vault
         vm.startPrank(eoa_accounts[1]);
         vm.expectRevert(abi.encodeWithSelector(InvalidVault.selector, eoa_accounts[1], vaultIDs[0]));
-        vaultManager.adjustTab(vaultIDs[0], 10e18, false);
+        vaultManager.paybackTab(vaultIDs[0], 10e18);
         vm.stopPrank();
 
         cBTC.mint(eoa_accounts[0], 10e18);
@@ -316,17 +323,18 @@ contract AuctionManagerTest is Test, Deployer {
         // expect revert: try to pay back Tabs on liquidated vault
         vm.startPrank(eoa_accounts[0]);
         vm.expectRevert("LIQUIDATED");
-        vaultManager.adjustTab(vaultIDs[0], 10e18, false);
+        vaultManager.paybackTab(vaultIDs[0], 10e18);
 
-        // expect success: vault owner increased reserve on liquidated reserve
+        // expect revert: vault owner increased reserve on liquidated vault
         cBTC.approve(address(vaultManager), 10e18);
-        vaultManager.adjustReserve(vaultIDs[0], 10e18, false);
+        vm.expectRevert(abi.encodeWithSelector(InvalidVault.selector, eoa_accounts[0], vaultIDs[0]));
+        vaultManager.depositReserve(vaultIDs[0], 10e18);
         vm.stopPrank();
 
         // expect revert: non-owner to increase reserve on liquidated vault
         vm.startPrank(eoa_accounts[1]);
         vm.expectRevert(abi.encodeWithSelector(InvalidVault.selector, eoa_accounts[1], vaultIDs[0]));
-        vaultManager.adjustReserve(vaultIDs[0], 10e18, false);
+        vaultManager.depositReserve(vaultIDs[0], 10e18);
         vm.stopPrank();
     }
 
@@ -363,7 +371,7 @@ contract AuctionManagerTest is Test, Deployer {
         assertEq(auctionPrice, 0);
 
         (tabCode, resKey, price, reserveAmt, osTab, reserveValue, minReserveValue) =
-            vaultManager.getVaultDetails(eoa_accounts[0], vaultIDs[0]);
+            vaultUtils.getVaultDetails(eoa_accounts[0], vaultIDs[0], priceOracle.getPrice(0x555344));
         assertEq(resKey, keccak256("CBTC"));
         assertEq(price, 1079999e16);
         assertEq(reserveAmt, expectedLeftoverReserve);
@@ -372,14 +380,15 @@ contract AuctionManagerTest is Test, Deployer {
         assertEq(minReserveValue, 0);
 
         // expect revert: non-owner attempt to claim leftover
+        IPriceOracle.UpdatePriceData memory priceData = signer.getUpdatePriceSignature(tabCode, price, block.timestamp);
         vm.expectRevert(abi.encodeWithSelector(InvalidVault.selector, eoa_accounts[9], vaultIDs[0]));
-        vaultManager.adjustReserve(vaultIDs[0], reserveValue, true);
+        vaultManager.withdrawReserve(vaultIDs[0], reserveValue, priceData);
         vm.stopPrank();
 
         // claimed leftover by vault owner
         vm.startPrank(eoa_accounts[0]);
         uint256 balB4Claim = cBTC.balanceOf(eoa_accounts[0]);
-        vaultManager.adjustReserve(vaultIDs[0], reserveAmt, true);
+        vaultManager.withdrawReserve(vaultIDs[0], reserveAmt, signer.getUpdatePriceSignature(tabCode, price, block.timestamp));
         assertEq(cBTC.balanceOf(eoa_accounts[0]), balB4Claim + reserveAmt);
         vm.stopPrank();
     }
@@ -402,9 +411,12 @@ contract AuctionManagerTest is Test, Deployer {
         vm.expectRevert("INVALID_BID_QTY");
         IAuctionManager(auctionManagerAddr).bid(vaultIDs[0], 0);
 
-        vm.expectRevert("INVALID_AUCTION_ID");
         (reserveQty, auctionAvailableQty, osTabAmt, auctionPrice) =
             IAuctionManager(auctionManagerAddr).getAuctionState(10);
+        assertEq(reserveQty, 0);
+        assertEq(auctionAvailableQty, 0);
+        assertEq(osTabAmt, 0);
+        assertEq(auctionPrice, 0);
 
         vm.expectRevert("INVALID_AUCTION_ID");
         (auctionStep, lastStepTimestamp) = IAuctionManager(auctionManagerAddr).getAuctionPrice(10, block.timestamp);
@@ -442,7 +454,7 @@ contract AuctionManagerTest is Test, Deployer {
         assertEq(auctionPrice, 0);
 
         (tabCode, resKey, price, reserveAmt, osTab, reserveValue, minReserveValue) =
-            vaultManager.getVaultDetails(eoa_accounts[0], vaultIDs[0]);
+            vaultUtils.getVaultDetails(eoa_accounts[0], vaultIDs[0], priceOracle.getPrice(0x555344));
         assertEq(resKey, keccak256("CBTC"));
         assertEq(price, 1079999e16);
         assertEq(reserveAmt, 0);
@@ -547,9 +559,9 @@ contract AuctionManagerTest is Test, Deployer {
         assertEq(vaultIDs[0], 2);
 
         (tabCode, resKey, price, reserveAmt, osTab, reserveValue, minReserveValue) =
-            vaultManager.getVaultDetails(eoa_accounts[9], vaultIDs[0]);
+            vaultUtils.getVaultDetails(eoa_accounts[9], vaultIDs[0], priceOracle.getPrice(0x555344));
         bytes memory checkVaultData = abi.encodeWithSignature(
-            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256))",
+            "checkVault(uint256,(address,uint256,bytes3,bytes32,uint256,uint256,uint256),(address,address,bytes3,uint256,uint256,uint8,bytes32,bytes32))",
             block.timestamp,
             eoa_accounts[9],
             vaultIDs[0],
@@ -557,7 +569,8 @@ contract AuctionManagerTest is Test, Deployer {
             reserve_cBTC,
             osTab,
             reserveValue,
-            minReserveValue
+            minReserveValue,
+            signer.getUpdatePriceSignature(_tabs[0], _prices[0], _timestamps[0])
         );
         startTime = block.timestamp;
         vm.expectEmit(auctionManagerAddr);

@@ -9,6 +9,7 @@ import "./Deployer.t.sol";
 import "./helper/RateSimulator.sol";
 import { IERC20 } from "../../contracts/shared/interfaces/IERC20.sol";
 import { IGovernanceAction } from "../../contracts/governance/interfaces/IGovernanceAction.sol";
+import { IPriceOracle } from "../../contracts/oracle/interfaces/IPriceOracle.sol";
 
 contract GovernanceActionTest is Test, Deployer {
 
@@ -16,6 +17,7 @@ contract GovernanceActionTest is Test, Deployer {
     bytes3[] _tabs;
     uint256[] _prices;
     uint256[] _timestamps;
+    IPriceOracle.UpdatePriceData priceData;
 
     event FreezeTab(bytes3 indexed tab);
     event UnfreezeTab(bytes3 indexed tab);
@@ -38,9 +40,9 @@ contract GovernanceActionTest is Test, Deployer {
         bytes3 usd = bytes3(abi.encodePacked("USD"));
         bytes3 myr = bytes3(abi.encodePacked("MYR"));
         bytes3 jpy = bytes3(abi.encodePacked("JPY"));
-        vaultManager.initNewTab(usd);
-        vaultManager.initNewTab(myr);
-        vaultManager.initNewTab(jpy);
+        IGovernanceAction(governanceActionAddr).createNewTab(usd);
+        IGovernanceAction(governanceActionAddr).createNewTab(myr);
+        IGovernanceAction(governanceActionAddr).createNewTab(jpy);
 
         _tabs = new bytes3[](1);
         _tabs[0] = usd;
@@ -61,7 +63,7 @@ contract GovernanceActionTest is Test, Deployer {
         assertEq(cBTC.allowance(eoa_accounts[0], address(vaultManager)), 3e18);
 
         // create vault
-        vaultManager.createVault(reserve_cBTC, 1e18, usd, 5000e18); // RR 200%
+        vaultManager.createVault(reserve_cBTC, 1e18, 5000e18, signer.getUpdatePriceSignature(usd, _prices[0], _timestamps[0])); // RR 200%
 
         vm.stopPrank();
 
@@ -70,14 +72,15 @@ contract GovernanceActionTest is Test, Deployer {
         IGovernanceAction(governanceActionAddr).disableTab(usd);
 
         vm.startPrank(eoa_accounts[0]);
+        priceData = signer.getUpdatePriceSignature(usd, _prices[0], _timestamps[0]);
         vm.expectRevert("FROZEN_TAB");
-        vaultManager.createVault(reserve_cBTC, 1e18, usd, 5000e18);
+        vaultManager.createVault(reserve_cBTC, 1e18, 5000e18, priceData);
 
         vm.expectRevert("FROZEN_TAB");
-        vaultManager.adjustTab(1, 10e18, true);
+        vaultManager.withdrawTab(1, 10e18, priceData);
 
         vm.expectRevert("FROZEN_TAB");
-        vaultManager.adjustReserve(1, 1e17, false);
+        vaultManager.depositReserve(1, 1e17);
         vm.stopPrank();
 
         vm.expectRevert("INVALID_TAB");
@@ -95,14 +98,15 @@ contract GovernanceActionTest is Test, Deployer {
         IGovernanceAction(governanceActionAddr).enableTab(usd);
 
         vm.startPrank(eoa_accounts[0]);
-        vaultManager.adjustTab(1, 10e18, true);
-        vaultManager.adjustReserve(1, 1e17, false);
+        vaultManager.withdrawTab(1, 10e18, signer.getUpdatePriceSignature(usd, _prices[0], _timestamps[0]));
+        vaultManager.depositReserve(1, 1e17);
         vm.stopPrank();
 
         IGovernanceAction(governanceActionAddr).disableAllTabs();
         vm.startPrank(eoa_accounts[0]);
+        priceData = signer.getUpdatePriceSignature(usd, _prices[0], _timestamps[0]);
         vm.expectRevert("FROZEN_TAB");
-        vaultManager.createVault(reserve_cBTC, 1e18, usd, 5000e18);
+        vaultManager.createVault(reserve_cBTC, 1e18, 5000e18, priceData);
 
         assertEq(tabRegistry.frozenTabs(usd), true);
         assertEq(tabRegistry.frozenTabs(myr), true);
@@ -125,7 +129,7 @@ contract GovernanceActionTest is Test, Deployer {
 
         IGovernanceAction(governanceActionAddr).enableAllTabs();
         vm.startPrank(eoa_accounts[0]);
-        vaultManager.createVault(reserve_cBTC, 1e18, usd, 5000e18);
+        vaultManager.createVault(reserve_cBTC, 1e18, 5000e18, signer.getUpdatePriceSignature(usd, _prices[0], _timestamps[0]));
         vm.stopPrank();
 
         assertEq(tabRegistry.frozenTabs(usd), false);

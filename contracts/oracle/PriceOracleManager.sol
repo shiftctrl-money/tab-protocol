@@ -221,6 +221,12 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
         inactivePeriod = _inactivePeriod;
     }
 
+    function getConfig() external view returns(uint256 _defBlockGenerationTimeInSecond, uint256 _movementDelta, uint256 _inactivePeriod) {
+        _defBlockGenerationTimeInSecond = defBlockGenerationTimeInSecond;
+        _movementDelta = movementDelta;
+        _inactivePeriod = inactivePeriod;
+    }
+
     /**
      *
      * @param blockNum Block number on activation

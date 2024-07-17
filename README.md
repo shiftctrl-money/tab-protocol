@@ -26,6 +26,10 @@ forge test -vvv
 ## Current Development Stage
 The project is currently being tested and optimized in [Arbitrum Sepolia testnet](https://sepolia.arbiscan.io).
 
+You may visit [Qwerty](https://qwerty.shiftctrl.money) to join testing.
+
+WBTC token is used as protocol reserve, visit [Faucet](https://qwerty.shiftctrl.money/faucet) to request test token.
+
 Please refer to deployed smart contract addresses below:
 
 | Contract Name                             | Deployed Address (Arbitrum Sepolia)                                                                                        |
@@ -39,17 +43,20 @@ Please refer to deployed smart contract addresses below:
 |ShiftCtrlEmergencyGovernor					|[0xF9C8F1ECc0e701204616033f1d52Ff30B83009bB](https://sepolia.arbiscan.io/address/0xF9C8F1ECc0e701204616033f1d52Ff30B83009bB)|
 |cBTC Proxy Admin							|[0x6E7fEcDb7c833EA10DC47B34dD15b1e1EdFA8449](https://sepolia.arbiscan.io/address/0x6E7fEcDb7c833EA10DC47B34dD15b1e1EdFA8449)|
 |cBTC										|[0x538a7C3b36315554DDa6B1f8321c2e50fd95a271](https://sepolia.arbiscan.io/address/0x538a7C3b36315554DDa6B1f8321c2e50fd95a271)|
+|WBTC										|[0xF859eF009E632C7df37a73D5827A84FF0B43aDe6](https://sepolia.arbiscan.io/address/0xF859eF009E632C7df37a73D5827A84FF0B43aDe6)|
 |GovernanceAction							|[0x7375C23a3815455D673c7366C2102e3685537B20](https://sepolia.arbiscan.io/address/0x7375C23a3815455D673c7366C2102e3685537B20)|
-|VaultManager								|[0x4aEAe1e78fD0b7B329e5Ea808F124ca05Ca3BA00](https://sepolia.arbiscan.io/address/0x4aEAe1e78fD0b7B329e5Ea808F124ca05Ca3BA00)|
+|VaultManager								|[0x6aA52f8b0bDf627f59E635dA95c735232881c93b](https://sepolia.arbiscan.io/address/0x6aA52f8b0bDf627f59E635dA95c735232881c93b)|
+|VaultUtils                                 |[0xd84E8dfD237D4c8ab47B2291441b1d4826EBDf01](https://sepolia.arbiscan.io/address/0xd84E8dfD237D4c8ab47B2291441b1d4826EBDf01)|
 |TabRegistry								|[0x5B2949601CDD3721FF11bF55419F427c9C118e2c](https://sepolia.arbiscan.io/address/0x5B2949601CDD3721FF11bF55419F427c9C118e2c)|
 |TabFactory									|[0x99eff83A66284459946Ff36E4c8eAa92f07d6782](https://sepolia.arbiscan.io/address/0x99eff83A66284459946Ff36E4c8eAa92f07d6782)|
-|AuctionManager								|[0x7f45645523112EF72343083EB6C228088367CA74](https://sepolia.arbiscan.io/address/0x7f45645523112EF72343083EB6C228088367CA74)|
+|AuctionManager								|[0x66bC50E59Ccb8d1775C73A69a252Ce43b7d047A8](https://sepolia.arbiscan.io/address/0x66bC50E59Ccb8d1775C73A69a252Ce43b7d047A8)|
 |Config										|[0x1a13d6a511A9551eC1A493C26362836e80aC4d65](https://sepolia.arbiscan.io/address/0x1a13d6a511A9551eC1A493C26362836e80aC4d65)|
-|ReserveRegistry							|[0x666A895b1fcda4272A29d67c40b91a15e469F442](https://sepolia.arbiscan.io/address/0x666A895b1fcda4272A29d67c40b91a15e469F442)|
-|ReserveSafe								|[0xdBcc591BaD48CA1Ab7D359C5A661C3a2150A4a08](https://sepolia.arbiscan.io/address/0xdBcc591BaD48CA1Ab7D359C5A661C3a2150A4a08)|
-|PriceOracleManager							|[0x6C7deFcCf6c3bfF17BE5B241a29fA691f0E46509](https://sepolia.arbiscan.io/address/0x6C7deFcCf6c3bfF17BE5B241a29fA691f0E46509)|
-|PriceOracle								|[0x2fd5AF90C453B931179B2aDDF901e2E649fE6623](https://sepolia.arbiscan.io/address/0x2fd5AF90C453B931179B2aDDF901e2E649fE6623)|
-|VaultKeeper								|[0xae7a2C1eB2F7d9AFEEDCF1c850D97659087F38Ff](https://sepolia.arbiscan.io/address/0xae7a2C1eB2F7d9AFEEDCF1c850D97659087F38Ff)|
+|ReserveRegistry							|[0x2A4Dc0e2Ff4210ec81b14eC97CE3fB755824B0C7](https://sepolia.arbiscan.io/address/0x2A4Dc0e2Ff4210ec81b14eC97CE3fB755824B0C7)|
+|ReserveSafe (WBTC)							|[0xEc0e4922F4427b06475A5fd3ec729467BbaB8de3](https://sepolia.arbiscan.io/address/0xEc0e4922F4427b06475A5fd3ec729467BbaB8de3)|
+|ReserveSafe (CBTC)	 						|[0x9120c1Cb0c5eBa7946865E1EEa2C584f2865821C](https://sepolia.arbiscan.io/address/0x9120c1Cb0c5eBa7946865E1EEa2C584f2865821C)|
+|PriceOracleManager							|[0xcfE44C253C9b37FDD54d36C600D33Cbf3edfA5B7](https://sepolia.arbiscan.io/address/0xcfE44C253C9b37FDD54d36C600D33Cbf3edfA5B7)|
+|PriceOracle								|[0x4a6D701F5CD7605be2eC9EA1D945f07D8DdbD1f0](https://sepolia.arbiscan.io/address/0x4a6D701F5CD7605be2eC9EA1D945f07D8DdbD1f0)|
+|VaultKeeper								|[0xd67937ca4d249a4caC262B18c3cCB747042Dd51B](https://sepolia.arbiscan.io/address/0xd67937ca4d249a4caC262B18c3cCB747042Dd51B)|
 |ProtocolVault 								|[0x67E332459A81F3d64142829541b6fec608356B63](https://sepolia.arbiscan.io/address/0x67E332459A81F3d64142829541b6fec608356B63)|
 
 

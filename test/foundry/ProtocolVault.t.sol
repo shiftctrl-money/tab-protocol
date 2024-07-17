@@ -13,7 +13,9 @@ import {
 import { IGovernanceAction } from "../../contracts/governance/interfaces/IGovernanceAction.sol";
 import { IPriceOracleManager } from "../../contracts/oracle/interfaces/IPriceOracleManager.sol";
 import { ProtocolVault } from "../../contracts/ProtocolVault.sol";
+import { IPriceOracle } from "../../contracts/oracle/interfaces/IPriceOracle.sol";
 import { CBTC } from "../../contracts/token/CBTC.sol";
+import { WBTC } from "../../contracts/token/WBTC.sol";
 import { TabERC20 } from "../../contracts/token/TabERC20.sol";
 import { ReserveSafe } from "../../contracts/ReserveSafe.sol";
 
@@ -65,9 +67,12 @@ contract ProtocolVaultTest is Test, Deployer {
     address wbtc1Addr;
     address wbtc2Addr;
     CBTC wBTC1;
-    CBTC wBTC2;
+    WBTC wBTC2;
     ReserveSafe btc1Safe;
     ReserveSafe btc2Safe;
+
+    uint256 valueInOriDecimal;
+    uint256 valueInDec18;
 
     // ProtocolVault
     struct PVault {
@@ -87,6 +92,8 @@ contract ProtocolVaultTest is Test, Deployer {
         uint256 osTabAmt; // other O/S tab, e.g. risk penalty or fee amt
         uint256 pendingOsMint; //  osTabAmt to be minted out
     }
+
+    IPriceOracle.UpdatePriceData priceData;
 
     event InitCtrlAltDel(address reserveAddr, uint256 reserveAmt, address tabAddr, uint256 tabAmt, uint256 price);
     event BuyTab(address indexed buyer, address reserveAddr, uint256 reserveAmt, address tabAddr, uint256 tabAmt);
@@ -123,7 +130,7 @@ contract ProtocolVaultTest is Test, Deployer {
         (tab10, price10) = rs.retrieve10(100);
 
         for (uint256 i = 0; i < 10; i++) {
-            vaultManager.initNewTab(tab10[i]); // tab creation order: TabRegistry, PriceOracleManager
+            IGovernanceAction(governanceActionAddr).createNewTab(tab10[i]); // tab creation order: TabRegistry, PriceOracleManager
 
             AccessControlInterface(tabRegistry.tabs(tab10[i])).grantRole(MINTER_ROLE, protocolVaultAddr);
 
@@ -166,11 +173,11 @@ contract ProtocolVaultTest is Test, Deployer {
         btc1Safe = new ReserveSafe(owner, owner, address(vaultManager), wbtc1Addr);
         reserveRegistry.addReserve(reserve_WBTC1, wbtc1Addr, address(btc1Safe));
 
-        bytes32 reserve_WBTC2 = keccak256("WBTC2");
-        ctrlBTCImplementation = address(new CBTC());
+        bytes32 reserve_WBTC2 = keccak256("WBTC");
+        ctrlBTCImplementation = address(new WBTC());
         wbtc2Addr =
             address(new TransparentUpgradeableProxy(ctrlBTCImplementation, address(cBTCProxyAdmin), ctrlBtcInitData));
-        wBTC2 = CBTC(wbtc2Addr);
+        wBTC2 = WBTC(wbtc2Addr);
         btc2Safe = new ReserveSafe(owner, owner, address(vaultManager), wbtc2Addr);
         reserveRegistry.addReserve(reserve_WBTC2, wbtc2Addr, address(btc2Safe));
 
@@ -200,13 +207,13 @@ contract ProtocolVaultTest is Test, Deployer {
         wBTC1.approve(address(vaultManager), type(uint256).max);
         wBTC2.approve(address(vaultManager), type(uint256).max);
 
-        vaultManager.createVault(reserve_ctrlBTC, 5e18, tab10[0], 10000e18);
-        vaultManager.createVault(reserve_WBTC2, 2e18, tab10[0], 1234e18);
-        vaultManager.createVault(reserve_WBTC1, 1e17, tab10[1], 1e18); // tab-1, ignored
-        vaultManager.createVault(reserve_WBTC1, 5e18, tab10[0], 1648e18);
-        vaultManager.createVault(reserve_WBTC2, 5e18, tab10[0], 20400e18);
-        vaultManager.createVault(reserve_WBTC1, 1e17, tab10[2], 1e18); // tab-2, to be ignored
-        vaultManager.createVault(reserve_ctrlBTC, 5e18, tab10[0], 10000e18);
+        vaultManager.createVault(reserve_ctrlBTC, 5e18, 10000e18, signer.getUpdatePriceSignature(tab10[0], priceOracle.getPrice(tab10[0]), block.timestamp));
+        vaultManager.createVault(reserve_WBTC2, 2e18, 1234e18, signer.getUpdatePriceSignature(tab10[0], priceOracle.getPrice(tab10[0]), block.timestamp));
+        vaultManager.createVault(reserve_WBTC1, 1e17, 1e18, signer.getUpdatePriceSignature(tab10[1], priceOracle.getPrice(tab10[1]), block.timestamp)); // tab-1, ignored
+        vaultManager.createVault(reserve_WBTC1, 5e18, 1648e18, signer.getUpdatePriceSignature(tab10[0], priceOracle.getPrice(tab10[0]), block.timestamp));
+        vaultManager.createVault(reserve_WBTC2, 5e18, 20400e18, signer.getUpdatePriceSignature(tab10[0], priceOracle.getPrice(tab10[0]), block.timestamp));
+        vaultManager.createVault(reserve_WBTC1, 1e17, 1e18, signer.getUpdatePriceSignature(tab10[2], priceOracle.getPrice(tab10[2]), block.timestamp)); // tab-2, to be ignored
+        vaultManager.createVault(reserve_ctrlBTC, 5e18, 10000e18, signer.getUpdatePriceSignature(tab10[0], priceOracle.getPrice(tab10[0]), block.timestamp));
 
         vm.stopPrank();
 
@@ -216,8 +223,8 @@ contract ProtocolVaultTest is Test, Deployer {
         wBTC1.approve(address(vaultManager), type(uint256).max);
         wBTC2.approve(address(vaultManager), type(uint256).max);
 
-        vaultManager.createVault(reserve_WBTC2, 5e18, tab10[1], 20400e18); // tab-1, ignored
-        vaultManager.createVault(reserve_WBTC1, 1e18, tab10[0], 1e18);
+        vaultManager.createVault(reserve_WBTC2, 5e18, 20400e18, signer.getUpdatePriceSignature(tab10[1], priceOracle.getPrice(tab10[1]), block.timestamp)); // tab-1, ignored
+        vaultManager.createVault(reserve_WBTC1, 1e18, 1e18, signer.getUpdatePriceSignature(tab10[0], priceOracle.getPrice(tab10[0]), block.timestamp));
 
         vm.stopPrank();
     }
@@ -247,13 +254,23 @@ contract ProtocolVaultTest is Test, Deployer {
         return (bytes32(part1), bytes32(part2), s);
     }
 
-    function getTotalReserveConsolidated(uint256 price) internal pure returns (uint256 total) {
+    function getTotalReserveConsolidated(uint256 price) internal returns (uint256 total) {
         total += FixedPointMathLib.mulDiv(10000e18, 1e18, price); // vault 1  reserve_ctrlBTC
-        total += FixedPointMathLib.mulDiv(1234e18, 1e18, price); // vault 2  reserve_WBTC2
+        (valueInOriDecimal, valueInDec18) = reserveRegistry.getOriReserveAmt(wbtc2Addr, FixedPointMathLib.mulDiv(1234e18, 1e18, price));
+        total += valueInDec18; // vault 2  reserve_WBTC2
         total += FixedPointMathLib.mulDiv(1648e18, 1e18, price); // vault 4  reserve_WBTC1
-        total += FixedPointMathLib.mulDiv(20400e18, 1e18, price); // vault 5  reserve_WBTC2
+        (valueInOriDecimal, valueInDec18) = reserveRegistry.getOriReserveAmt(wbtc2Addr, FixedPointMathLib.mulDiv(20400e18, 1e18, price));
+        total += valueInDec18; // vault 5  reserve_WBTC2
         total += FixedPointMathLib.mulDiv(10000e18, 1e18, price); // vault 7  reserve_ctrlBTC
         total += FixedPointMathLib.mulDiv(1e18, 1e18, price); // vault 9  reserve_WBTC1
+    }
+
+    function sumAmt(uint256 a, uint256 b) internal returns(uint256) {
+        (, valueInDec18) = reserveRegistry.getOriReserveAmt(wbtc2Addr, a);
+        uint256 sum = valueInDec18;
+        (, valueInDec18) = reserveRegistry.getOriReserveAmt(wbtc2Addr, b);
+        sum += valueInDec18;
+        return sum;
     }
 
     function testCtrlAltDel() public {
@@ -267,7 +284,7 @@ contract ProtocolVaultTest is Test, Deployer {
         vm.expectEmit(protocolVaultAddr);
         emit InitCtrlAltDel(
             wbtc2Addr,
-            FixedPointMathLib.mulDiv(1234e18, 1e18, fixedPrice) + FixedPointMathLib.mulDiv(20400e18, 1e18, fixedPrice),
+            sumAmt(FixedPointMathLib.mulDiv(1234e18, 1e18, fixedPrice), FixedPointMathLib.mulDiv(20400e18, 1e18, fixedPrice)),
             tab0Addr,
             (1234e18 + 20400e18),
             fixedPrice
@@ -329,7 +346,7 @@ contract ProtocolVaultTest is Test, Deployer {
         assertEq(v.reserveAddr, wbtc2Addr);
         assertEq(
             v.reserveAmt,
-            FixedPointMathLib.mulDiv(1234e18, 1e18, fixedPrice) + FixedPointMathLib.mulDiv(20400e18, 1e18, fixedPrice)
+            sumAmt(FixedPointMathLib.mulDiv(1234e18, 1e18, fixedPrice), FixedPointMathLib.mulDiv(20400e18, 1e18, fixedPrice))
         );
         assertEq(v.tab, tab0Addr);
         assertEq(v.tabAmt, 1234e18 + 20400e18);
@@ -362,8 +379,9 @@ contract ProtocolVaultTest is Test, Deployer {
         vm.stopPrank();
 
         vm.startPrank(eoa_accounts[0]);
+        priceData = signer.getUpdatePriceSignature(tab10[0], priceOracle.getPrice(tab10[0]), block.timestamp);
         vm.expectRevert("CTRL_ALT_DEL_DONE");
-        vaultManager.createVault(keccak256("WBTC2"), 1e18, tab10[0], 1e18);
+        vaultManager.createVault(keccak256("WBTC2"), 1e18, 1e18, priceData);
         vm.stopPrank();
     }
 
@@ -388,7 +406,8 @@ contract ProtocolVaultTest is Test, Deployer {
         assertEq(m.pendingOsMint, 0);
 
         (, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 2);
-        assertEq(m.reserveAmt, 2e18 - FixedPointMathLib.mulDiv(1234e18, 1e18, fixedPrice));
+        (valueInOriDecimal, valueInDec18) = reserveRegistry.getOriReserveAmt(wbtc2Addr, FixedPointMathLib.mulDiv(1234e18, 1e18, fixedPrice));
+        assertEq(m.reserveAmt, 2e18 - valueInDec18);
         assertEq(m.tabAmt, 0);
         assertEq(m.osTabAmt, 0);
         assertEq(m.pendingOsMint, 0);
@@ -406,7 +425,8 @@ contract ProtocolVaultTest is Test, Deployer {
         assertEq(m.pendingOsMint, 0);
 
         (, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 5);
-        assertEq(m.reserveAmt, 5e18 - FixedPointMathLib.mulDiv(20400e18, 1e18, fixedPrice));
+        (valueInOriDecimal, valueInDec18) = reserveRegistry.getOriReserveAmt(wbtc2Addr, FixedPointMathLib.mulDiv(20400e18, 1e18, fixedPrice));
+        assertEq(m.reserveAmt, 5e18 - valueInDec18 );
         assertEq(m.tabAmt, 0);
         assertEq(m.osTabAmt, 0);
         assertEq(m.pendingOsMint, 0);
@@ -426,21 +446,22 @@ contract ProtocolVaultTest is Test, Deployer {
         // withdraw excess reserve
         vm.startPrank(eoa_accounts[0]);
 
+        priceData = signer.getUpdatePriceSignature(tab10[1], priceOracle.getPrice(tab10[1]), block.timestamp);
         vm.expectRevert("EXCEED_WITHDRAWABLE_AMT");
-        vaultManager.adjustReserve(3, 1e17, true); // vault's tab is not ctrl-alt-del
+        vaultManager.withdrawReserve(3, 1e17, priceData); // vault's tab is not ctrl-alt-del
 
         address reserveSafeAddr = reserveRegistry.reserveAddrSafe(address(cBTC));
         uint256 balB4 = IERC20(address(cBTC)).balanceOf(reserveSafeAddr);
 
-        vaultManager.adjustReserve(1, 5e18 - FixedPointMathLib.mulDiv(10000e18, 1e18, fixedPrice), true);
+        vaultManager.withdrawReserve(1, 5e18 - FixedPointMathLib.mulDiv(10000e18, 1e18, fixedPrice), signer.getUpdatePriceSignature(tab10[0], priceOracle.getPrice(tab10[0]), block.timestamp));
         uint256 balAfter = IERC20(address(cBTC)).balanceOf(reserveSafeAddr);
         assertEq(balB4 - (5e18 - FixedPointMathLib.mulDiv(10000e18, 1e18, fixedPrice)), balAfter); // withdraw reserve
             // from safe
 
-        vaultManager.adjustReserve(2, 2e18 - FixedPointMathLib.mulDiv(1234e18, 1e18, fixedPrice), true);
+        vaultManager.withdrawReserve(2, 2e18 - FixedPointMathLib.mulDiv(1234e18, 1e18, fixedPrice), signer.getUpdatePriceSignature(tab10[0], priceOracle.getPrice(tab10[0]), block.timestamp));
 
         balB4 = wBTC1.balanceOf(eoa_accounts[0]); // 4800000000000000000
-        vaultManager.adjustReserve(4, 5e18 - FixedPointMathLib.mulDiv(1648e18, 1e18, fixedPrice), true);
+        vaultManager.withdrawReserve(4, 5e18 - FixedPointMathLib.mulDiv(1648e18, 1e18, fixedPrice), signer.getUpdatePriceSignature(tab10[0], priceOracle.getPrice(tab10[0]), block.timestamp));
 
         balAfter = wBTC1.balanceOf(eoa_accounts[0]);
         assertEq(balB4 + 5e18 - FixedPointMathLib.mulDiv(1648e18, 1e18, fixedPrice), balAfter); // owner received excess
@@ -467,7 +488,7 @@ contract ProtocolVaultTest is Test, Deployer {
 
         assertEq(bal1, 5e18 + 5e18);
         assertEq(bal2, 5e18 + 1e17 + 1e17 + 1e18);
-        assertEq(bal3, 5e18 + 2e18 + 5e18);
+        assertEq(bal3, 5e8 + 2e8 + 5e8);
 
         governanceAction.ctrlAltDel(tab10[0], fixedPrice);
 
@@ -489,8 +510,8 @@ contract ProtocolVaultTest is Test, Deployer {
             bal3Af,
             bal3
                 - (
-                    (FixedPointMathLib.mulDiv(1234e18, 1e18, fixedPrice))
-                        + (FixedPointMathLib.mulDiv(20400e18, 1e18, fixedPrice))
+                    (FixedPointMathLib.mulDiv(1234e8, 1e18, fixedPrice))
+                        + (FixedPointMathLib.mulDiv(20400e8, 1e18, fixedPrice))
                 )
         );
 
@@ -503,13 +524,23 @@ contract ProtocolVaultTest is Test, Deployer {
             bal2,
             ((FixedPointMathLib.mulDiv(1648e18, 1e18, fixedPrice)) + (FixedPointMathLib.mulDiv(1e18, 1e18, fixedPrice)))
         );
-        assertEq(
-            bal3,
-            (
-                (FixedPointMathLib.mulDiv(1234e18, 1e18, fixedPrice))
-                    + (FixedPointMathLib.mulDiv(20400e18, 1e18, fixedPrice))
-            )
+        (
+            valueInOriDecimal
+            , 
+        ) = reserveRegistry.getOriReserveAmt(
+            wbtc2Addr, 
+            FixedPointMathLib.mulDiv(1234e18, 1e18, fixedPrice)
         );
+        valueInDec18 = valueInOriDecimal;
+        (
+            valueInOriDecimal
+            , 
+        ) = reserveRegistry.getOriReserveAmt(
+            wbtc2Addr, 
+            FixedPointMathLib.mulDiv(20400e18, 1e18, fixedPrice)
+        );
+        valueInDec18 += valueInOriDecimal;
+        assertEq(bal3, valueInDec18);
     }
 
     function testDisabledReserve() public {
@@ -520,7 +551,7 @@ contract ProtocolVaultTest is Test, Deployer {
 
         reserveRegistry.removeReserve(keccak256("CBTC"));
 
-        vm.expectRevert("buyTab/DISABLED_RESERVE");
+        vm.expectRevert("DISABLED_RESERVE");
         protocolVault.buyTab(address(cBTC), tab0Addr, 1e18);
     }
 
@@ -553,12 +584,12 @@ contract ProtocolVaultTest is Test, Deployer {
         // console.log("Vault price: ", v.price);
 
         // validation checks
-        vm.expectRevert("buyTab/INVALID_VAULT");
+        vm.expectRevert("INVALID_VAULT");
         protocolVault.buyTab(eoa_accounts[8], tab0Addr, 1e18); // invalid eoa_accounts[8], expect reserve contract
             // address
-        vm.expectRevert("sellTab/INVALID_VAULT");
+        vm.expectRevert("INVALID_VAULT");
         protocolVault.sellTab(eoa_accounts[8], tab0Addr, 1e18); // invalid eoa_accounts[8]
-        vm.expectRevert("sellTab/INVALID_AMT");
+        vm.expectRevert("INVALID_AMT");
         protocolVault.sellTab(address(cBTC), tab0Addr, 1e30); // Sell tab amount exceeded tabAmt maintained in vault
 
         uint256 userBtcBalB4 = IERC20(address(cBTC)).balanceOf(eoa_accounts[5]);
@@ -624,7 +655,7 @@ contract ProtocolVaultTest is Test, Deployer {
         wBTC2.approve(protocolVaultAddr, type(uint256).max);
         TabERC20(tab1Addr).approve(protocolVaultAddr, type(uint256).max);
 
-        vm.expectRevert("sellTab/ZERO_RESERVE_AMT");
+        vm.expectRevert("ZERO_RESERVE_AMT");
         protocolVault.sellTab(wbtc1Addr, tab1Addr, 123);
 
         value = protocolVault.sellTab(wbtc1Addr, tab1Addr, v.tabAmt);
@@ -663,12 +694,12 @@ contract ProtocolVaultTest is Test, Deployer {
 
         address tab1Addr = tabRegistry.tabs(tab10[1]);
 
-        wBTC2.mint(eoa_accounts[5], 100e18);
+        wBTC2.mint(eoa_accounts[5], 100e8);
 
         uint256 treasuryBalB4 = TabERC20(tab1Addr).balanceOf(config.treasury());
 
-        vaultManager.chargeRiskPenalty(eoa_accounts[1], 8, riskPenaltyToCharge); // total os = 20400e18 +
-            // riskPenaltyToCharge
+        // total os = 20400e18 + riskPenaltyToCharge
+        vaultManager.chargeRiskPenalty(eoa_accounts[1], 8, riskPenaltyToCharge); 
 
         governanceAction.ctrlAltDel(tab10[1], fixedPrice);
 
@@ -709,22 +740,22 @@ contract ProtocolVaultTest is Test, Deployer {
 
         vm.startPrank(eoa_accounts[5]);
         wBTC1.approve(address(vaultManager), type(uint256).max);
-        vaultManager.createVault(reserve_WBTC1, 8e18, tab10[4], 100000e18);
+        vaultManager.createVault(reserve_WBTC1, 8e18, 100000e18, signer.getUpdatePriceSignature(tab10[4], priceOracle.getPrice(tab10[4]), block.timestamp));
         vm.stopPrank();
 
         vm.startPrank(eoa_accounts[6]);
         wBTC1.approve(address(vaultManager), type(uint256).max);
-        vaultManager.createVault(reserve_WBTC1, 10e18, tab10[4], 120000e18);
+        vaultManager.createVault(reserve_WBTC1, 10e18, 120000e18, signer.getUpdatePriceSignature(tab10[4], priceOracle.getPrice(tab10[4]), block.timestamp));
         vm.stopPrank();
 
         vm.startPrank(eoa_accounts[7]);
         wBTC1.approve(address(vaultManager), type(uint256).max);
-        vaultManager.createVault(reserve_WBTC1, 45e18, tab10[4], 500000e18);
+        vaultManager.createVault(reserve_WBTC1, 45e18, 500000e18, signer.getUpdatePriceSignature(tab10[4], priceOracle.getPrice(tab10[4]), block.timestamp));
         vm.stopPrank();
 
         vm.startPrank(eoa_accounts[8]);
         wBTC1.approve(address(vaultManager), type(uint256).max);
-        vaultManager.createVault(reserve_WBTC1, 10e18, tab10[4], 166666e18);
+        vaultManager.createVault(reserve_WBTC1, 10e18, 166666e18, signer.getUpdatePriceSignature(tab10[4], priceOracle.getPrice(tab10[4]), block.timestamp));
         vm.stopPrank();
 
         vaultManager.chargeRiskPenalty(eoa_accounts[5], 10, 3000e18);

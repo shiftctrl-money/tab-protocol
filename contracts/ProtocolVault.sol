@@ -77,42 +77,43 @@ contract ProtocolVault is Initializable, AccessControlDefaultAdminRulesUpgradeab
     /// @dev Mint Tabs. Required allowance on user's BTC reserve. User pays BTC(_reserveAmt) to get TAB.
     function buyTab(address _reserveAddr, address _tabAddr, uint256 _reserveAmt) external returns (uint256) {
         PVault storage vault = vaults[_reserveAddr][_tabAddr];
-        require(vault.price > 0, "buyTab/INVALID_VAULT");
-        require(_reserveAmt > 0, "buyTab/INVALID_AMT");
-        require(IReserveRegistry(reserveRegistry).isEnabledReserve(_reserveAddr), "buyTab/DISABLED_RESERVE");
+        require(vault.price > 0, "INVALID_VAULT");
+        require(_reserveAmt > 0, "INVALID_AMT");
 
         uint256 tabAmt = FixedPointMathLib.mulWad(_reserveAmt, vault.price);
+        (uint256 valueInOriDecimal, uint256 valueInDec18) = IReserveRegistry(reserveRegistry).getOriReserveAmt(_reserveAddr, _reserveAmt);
 
-        vault.reserveAmt += _reserveAmt;
+        vault.reserveAmt += valueInDec18;
         vault.tabAmt += tabAmt;
 
         // Transfer reserve from user
-        SafeTransferLib.safeTransferFrom(_reserveAddr, _msgSender(), address(this), _reserveAmt);
+        SafeTransferLib.safeTransferFrom(_reserveAddr, _msgSender(), address(this), valueInOriDecimal);
 
         ITabERC20(vault.tab).mint(_msgSender(), tabAmt);
 
-        emit BuyTab(_msgSender(), _reserveAddr, _reserveAmt, _tabAddr, tabAmt);
+        emit BuyTab(_msgSender(), _reserveAddr, valueInDec18, _tabAddr, tabAmt);
         return tabAmt;
     }
 
     /// @dev Withdraw reserves. Required allowance on TAB. User gets BTC from selling(burning) TAB(_tabAmt)
     function sellTab(address _reserveAddr, address _tabAddr, uint256 _tabAmt) external returns (uint256) {
         PVault storage vault = vaults[_reserveAddr][_tabAddr];
-        require(vault.price > 0, "sellTab/INVALID_VAULT");
-        require(_tabAmt > 0 && _tabAmt <= vault.tabAmt, "sellTab/INVALID_AMT");
+        require(vault.price > 0, "INVALID_VAULT");
+        require(_tabAmt > 0 && _tabAmt <= vault.tabAmt, "INVALID_AMT");
 
         uint256 reserveAmt = FixedPointMathLib.divWad(_tabAmt, vault.price);
-        require(reserveAmt > 0, "sellTab/ZERO_RESERVE_AMT");
+        require(reserveAmt > 0, "ZERO_RESERVE_AMT");
+        (uint256 valueInOriDecimal, uint256 valueInDec18) = IReserveRegistry(reserveRegistry).getOriReserveAmt(_reserveAddr, reserveAmt);
 
         vault.tabAmt -= _tabAmt;
-        vault.reserveAmt -= reserveAmt;
+        vault.reserveAmt -= valueInDec18;
 
         ITabERC20(vault.tab).burnFrom(_msgSender(), _tabAmt);
 
-        SafeTransferLib.safeTransfer(_reserveAddr, _msgSender(), reserveAmt);
+        SafeTransferLib.safeTransfer(_reserveAddr, _msgSender(), valueInOriDecimal);
 
-        emit SellTab(_msgSender(), _reserveAddr, reserveAmt, _tabAddr, _tabAmt);
-        return reserveAmt;
+        emit SellTab(_msgSender(), _reserveAddr, valueInDec18, _tabAddr, _tabAmt);
+        return valueInDec18;
     }
 
     function _msgSender() internal view override returns (address) {

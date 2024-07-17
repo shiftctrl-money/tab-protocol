@@ -66,7 +66,7 @@ contract ReserveRegistryTest is Test {
     }
 
     function testReAddReserveWithExistingKey() public {
-        address newMockTokenAddress = address(2);
+        address newMockTokenAddress = address(mockToken);
         address newDummySafe = address(3);
         registry.addReserve(TEST_RESERVE_KEY, newMockTokenAddress, newDummySafe);
         assertEq(registry.reserveAddr(TEST_RESERVE_KEY), newMockTokenAddress);

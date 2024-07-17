@@ -101,7 +101,7 @@ contract PriceOracleManagerTest is Test, Deployer {
         (tab10, price10) = rs.retrieve10(100);
 
         for (uint256 i = 0; i < 10; i++) {
-            vaultManager.initNewTab(tab10[i]); // tab creation order: TabRegistry, PriceOracleManager
+            IGovernanceAction(governanceActionAddr).createNewTab(tab10[i]); // tab creation order: TabRegistry, PriceOracleManager
             uint256[9] memory prices;
             for (uint256 n = 0; n < 9; n++) {
                 prices[n] = price10[i] + n;

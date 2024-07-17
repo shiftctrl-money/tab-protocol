@@ -29,6 +29,7 @@ contract ReserveSafe is AccessControlDefaultAdminRules {
         reserveInterface = IERC20(_reserveAddr);
     }
 
+    /// @dev Unlocked value must follow reserve token's decimal value.
     function unlockReserve(address _reserveOwner, uint256 value) external onlyRole(UNLOCKER_ROLE) returns (bool) {
         emit UnlockedReserve(msg.sender, _reserveOwner, value);
         SafeERC20.safeTransfer(reserveInterface, _reserveOwner, value);

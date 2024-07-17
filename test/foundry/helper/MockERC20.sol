@@ -45,4 +45,8 @@ contract MockERC20 is IERC20 {
         return true;
     }
 
+    function decimals() public pure returns (uint8) {
+        return 18;
+    }
+
 }

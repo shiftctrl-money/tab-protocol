@@ -5,8 +5,10 @@ import "forge-std/console.sol";
 // import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { IVotes } from "@openzeppelin/contracts/governance/utils/IVotes.sol";
+import { Signer } from "./helper/Signer.sol";
 import "../../contracts/token/CTRL.sol";
 import "../../contracts/token/CBTC.sol";
+import "../../contracts/token/WBTC.sol";
 import "../../contracts/token/TabERC20.sol";
 import "../../contracts/governance/TimelockController.sol";
 import "../../contracts/governance/ShiftCtrlGovernor.sol";
@@ -42,11 +44,13 @@ abstract contract Deployer {
     bytes32 public constant USER_ROLE = keccak256("USER_ROLE");
 
     address public owner;
+    Signer signer;
     address[] public eoa_accounts;
 
     TabProxyAdmin cBTCProxyAdmin;
     TabProxyAdmin ctrlProxyAdmin;
     CBTC cBTC;
+    WBTC wBTC;
     CTRL ctrl;
     TimelockController timelockController;
     ShiftCtrlGovernor shiftCtrlGovernor;
@@ -59,6 +63,7 @@ abstract contract Deployer {
     Config config;
     ReserveRegistry reserveRegistry;
     ReserveSafe reserveSafe;
+    ReserveSafe wBTCReserveSafe;
     TabRegistry tabRegistry;
     TabFactory tabFactory;
     PriceOracle priceOracle;
@@ -99,6 +104,9 @@ abstract contract Deployer {
             address(new TransparentUpgradeableProxy(cBTCImplementation, address(cBTCProxyAdmin), cBtcInitData));
         cBTC = CBTC(cBTCAddr);
 
+        address wBTCImplementation = address(new WBTC());
+        wBTC = WBTC(address(new TransparentUpgradeableProxy(wBTCImplementation, address(cBTCProxyAdmin), cBtcInitData)));
+
         // deploy governance token: CTRL
         address ctrlImplementation = address(new CTRL());
         bytes memory ctrlInitData = abi.encodeWithSignature("initialize(address)", owner);
@@ -138,7 +146,7 @@ abstract contract Deployer {
 
         // VaultManager
         bytes memory vaultManagerInitData =
-            abi.encodeWithSignature("initialize(address,address,address,address)", owner, owner, owner, owner);
+            abi.encodeWithSignature("initialize(address,address,address)", owner, owner, owner);
         VaultManager vaultManagerImpl = new VaultManager(); // implementation
         vaultManagerAddr = address(
             new TransparentUpgradeableProxy(address(vaultManagerImpl), address(tabProxyAdmin), vaultManagerInitData)
@@ -151,11 +159,8 @@ abstract contract Deployer {
         tabFactory = new TabFactory(owner, address(tabRegistry));
         tabRegistry.setTabFactory(address(tabFactory));
 
-        // AuctionManager
-        auctionManager = new AuctionManager(owner, owner, vaultManagerAddr);
-        auctionManagerAddr = address(auctionManager);
-
         bytes32 res_cBTC = keccak256("CBTC");
+        bytes32 res_wBTC = keccak256("WBTC");
 
         // ReserveRegistry
         reserveRegistry = new ReserveRegistry(owner, owner, owner, owner);
@@ -163,6 +168,12 @@ abstract contract Deployer {
         // ReserveSafe
         reserveSafe = new ReserveSafe(owner, owner, address(vaultManager), address(cBTC));
         reserveRegistry.addReserve(res_cBTC, address(cBTC), address(reserveSafe));
+        wBTCReserveSafe = new ReserveSafe(owner, owner, address(vaultManager), address(wBTC));
+        reserveRegistry.addReserve(res_wBTC, address(wBTC), address(wBTCReserveSafe));
+
+        // AuctionManager
+        auctionManager = new AuctionManager(owner, owner, vaultManagerAddr, address(reserveRegistry));
+        auctionManagerAddr = address(auctionManager);
 
         // Governance Action
         bytes memory governanceActionInitData =
@@ -259,6 +270,11 @@ abstract contract Deployer {
         uint256[] memory liquidationRatio = new uint256[](1);
         liquidationRatio[0] = 120;
         config.setReserveParams(res, processFeeRate, minReserveRatio, liquidationRatio);
+
+        res[0] = res_wBTC;
+        config.setReserveParams(res, processFeeRate, minReserveRatio, liquidationRatio);
+
+        signer = new Signer(address(priceOracle));
     }
 
 }
