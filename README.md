@@ -30,6 +30,8 @@ You may visit [Qwerty](https://qwerty.shiftctrl.money) to join testing.
 
 WBTC token is used as protocol reserve, visit [Faucet](https://qwerty.shiftctrl.money/faucet) to request test token.
 
+Check on [Tab Contract Address](https://github.com/shiftctrl-money/tab-protocol/blob/92d3eb29e8b9c2d8a0d275c63efb56f4ff0c3de8/contracts/token/Tabs.md) to add minted Tabs into your wallet.
+
 Please refer to deployed smart contract addresses below:
 
 | Contract Name                             | Deployed Address (Arbitrum Sepolia)                                                                                        |
@@ -58,7 +60,6 @@ Please refer to deployed smart contract addresses below:
 |PriceOracle								|[0x4a6D701F5CD7605be2eC9EA1D945f07D8DdbD1f0](https://sepolia.arbiscan.io/address/0x4a6D701F5CD7605be2eC9EA1D945f07D8DdbD1f0)|
 |VaultKeeper								|[0xd67937ca4d249a4caC262B18c3cCB747042Dd51B](https://sepolia.arbiscan.io/address/0xd67937ca4d249a4caC262B18c3cCB747042Dd51B)|
 |ProtocolVault 								|[0x67E332459A81F3d64142829541b6fec608356B63](https://sepolia.arbiscan.io/address/0x67E332459A81F3d64142829541b6fec608356B63)|
-
 
 ## Contributing
 
