@@ -234,7 +234,6 @@ contract VaultKeeper is Initializable, AccessControlDefaultAdminRulesUpgradeable
 
     /// @dev Single vault risk penalty update whenever vault operation is performed by VaultManager
     function pushVaultRiskPenalty(address _vaultOwner, uint256 _vaultId) external onlyRole(EXECUTOR_ROLE) {
-        require(block.timestamp >= checkedTimestamp, "OUTDATED_TIMESTAMP");
         if (largestVaultDelta[_vaultOwner][_vaultId] > 0 && vaultIdList.length > 0) {
             VaultCacheDetails memory vd = vaultMap[_vaultId];
 
