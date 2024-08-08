@@ -8,6 +8,10 @@ import { ITabFactory } from "./shared/interfaces/ITabFactory.sol";
 import { IVaultManager } from "./shared/interfaces/IVaultManager.sol";
 import { AccessControlDefaultAdminRules } from "@openzeppelin/contracts/access/AccessControlDefaultAdminRules.sol";
 
+/**
+ * @title  Manage authorized Tab contracts.
+ * @notice Refer https://www.shiftctrl.money for details.
+ */
 contract TabRegistry is AccessControlDefaultAdminRules {
 
     bytes32 public constant USER_ROLE = keccak256("USER_ROLE");
@@ -169,14 +173,14 @@ contract TabRegistry is AccessControlDefaultAdminRules {
 
     function disableTab(bytes3 _tab) external onlyRole(TAB_PAUSER_ROLE) {
         require(tabs[_tab] != address(0), "INVALID_TAB");
-        require(frozenTabs[_tab] == false, "TAB_FROZEN");
+        require(!frozenTabs[_tab], "TAB_FROZEN");
 
         emit FreezeTab(_tab);
         frozenTabs[_tab] = true;
     }
 
     function enableAllTab() external onlyRole(ALL_TAB_PAUSER_ROLE) {
-        for (uint256 i = 0; i < activatedTabCount; i++) {
+        for (uint256 i = 0; i < activatedTabCount; ++i) {
             bytes3 _tab = tabList[i];
             emit UnfreezeTab(_tab);
             frozenTabs[_tab] = false;
@@ -184,13 +188,17 @@ contract TabRegistry is AccessControlDefaultAdminRules {
     }
 
     function disableAllTab() external onlyRole(ALL_TAB_PAUSER_ROLE) {
-        for (uint256 i = 0; i < activatedTabCount; i++) {
+        for (uint256 i = 0; i < activatedTabCount; ++i) {
             bytes3 _tab = tabList[i];
             emit FreezeTab(_tab);
             frozenTabs[_tab] = true;
         }
     }
 
+    /**
+     * @dev Register and create new Tab.
+     * @param _tab New tab code.
+     */
     function createTab(bytes3 _tab) external onlyRole(USER_ROLE) returns (address) {
         if (tabs[_tab] != address(0)) {
             return tabs[_tab];
@@ -216,7 +224,7 @@ contract TabRegistry is AccessControlDefaultAdminRules {
     function getCtrlAltDelTabList() external view returns (bytes3[] memory ctrlAltDelTabList) {
         ctrlAltDelTabList = new bytes3[](activatedTabCount);
         uint256 count = 0;
-        for (uint256 i = 0; i < activatedTabCount; i++) {
+        for (uint256 i = 0; i < activatedTabCount; ++i) {
             if (ctrlAltDelTab[tabList[i]] > 0) {
                 ctrlAltDelTabList[count] = tabList[i];
                 count += 1;

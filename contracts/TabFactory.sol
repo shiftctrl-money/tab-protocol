@@ -6,7 +6,11 @@ import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/trans
 import { CREATE3 } from "lib/solady/src/utils/CREATE3.sol";
 import { TabERC20 } from "./token/TabERC20.sol";
 
-/// @dev to deploy with https://github.com/SKYBITDev3/SKYBIT-Keyless-Deployment
+/**
+ * @dev Dependency on https://github.com/SKYBITDev3/SKYBIT-Keyless-Deployment to create fixed contract address.
+ * @title  Factory to create new Tab contract.
+ * @notice Refer https://www.shiftctrl.money for details.
+ */
 contract TabFactory is AccessControlDefaultAdminRules {
 
     bytes32 public constant USER_ROLE = keccak256("USER_ROLE");
@@ -36,8 +40,7 @@ contract TabFactory is AccessControlDefaultAdminRules {
         returns (address)
     {
         bytes memory deployCode = type(TransparentUpgradeableProxy).creationCode;
-        bytes memory initData =
-            abi.encodeWithSignature("initialize(string,string,address,address)", _name, _symbol, _admin, _vaultManager);
+        bytes memory initData = abi.encodeCall(TabERC20.initialize, (_name, _symbol, _admin, _vaultManager));
         bytes memory params = abi.encode(address(tabERC20), _tabProxyAdmin, initData);
 
         // CREATE3.deploy(

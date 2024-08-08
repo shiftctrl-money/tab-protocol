@@ -13,9 +13,12 @@ import "./shared/interfaces/IReserveRegistry.sol";
 import "./shared/interfaces/IConfig.sol";
 import "./shared/interfaces/IVaultKeeper.sol";
 import "./shared/interfaces/IProtocolVault.sol";
-import "./oracle/interfaces/IPriceOracle.sol";
 import "./shared/interfaces/IAuctionManager.sol";
 
+/**
+ * @title  Manage vault to deposit/withdraw reserve and mint/burn Tabs.
+ * @notice Refer https://www.shiftctrl.money for details. 
+ */
 contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeable, UUPSUpgradeable {
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
@@ -130,7 +133,14 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
         return vaultOwners[_owner];
     }
 
-    /// @dev Retrieved signed price from authorized source to create new vault
+    /**
+     * @dev Create vault by depositing reserve and specify tab amount to mint. 
+     * Required allowance to spend reserve, call `approve` on reserve contract before calling `createVault`.
+     * @param _reserveKey Reserve key registered with protocol, refer `ReserveRegistry` contract.
+     * @param _reserveAmt Reserve amount to deposit into the new vault. Deduct `_reserveAmt` from vault owner.
+     * @param _tabAmt Tab amount received by vault owner.
+     * @param sigPrice Signed tab rate authorized by oracle service.
+     */
     function createVault(
         bytes32 _reserveKey, 
         uint256 _reserveAmt, 
@@ -139,13 +149,12 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
     ) external {
         address _vaultOwner = _msgSender();
         require(_vaultOwner == sigPrice.updater, "INVALID_OWNER");
-        // _createVault(_vaultOwner, _reserveKey, _reserveAmt, _tabAmt, sigPrice);
         require(_reserveKey != 0x00, "INVALID_KEY"); // 0x00 is reserved default not available for vault operation
         require(_vaultOwner != address(0), "UNAUTHORIZED");
         
         bytes3 _tab = sigPrice.tab;
         require(ITabRegistry(tabRegistry).ctrlAltDelTab(_tab) == 0, "CTRL_ALT_DEL_DONE");
-        require(ITabRegistry(tabRegistry).frozenTabs(_tab) == false, "FROZEN_TAB");
+        require(!ITabRegistry(tabRegistry).frozenTabs(_tab), "FROZEN_TAB");
 
         // lock reserve
         (
@@ -185,7 +194,12 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
         emit NewVault(vaultId, _vaultOwner, reserveAddr, _reserveAmt, tab, _tabAmt);
     }
 
-    /// @dev mint tabs
+    /**
+     * @dev Withdraw tab from vault. Protocol will mint requested tab amount.
+     * @param _vaultId Vault ID.
+     * @param _tabAmt Tab amount to withdraw.
+     * @param sigPrice Tab rate signed by authorized oracle service.
+     */
     function withdrawTab(
         uint256 _vaultId, 
         uint256 _tabAmt, 
@@ -200,7 +214,7 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
         if(v.tabAmt == 0)
             revert InvalidVault(_vaultOwner, _vaultId);
         
-        require(ITabRegistry(tabRegistry).frozenTabs(ITabERC20(v.tab).tabCode()) == false, "FROZEN_TAB");
+        require(!ITabRegistry(tabRegistry).frozenTabs(ITabERC20(v.tab).tabCode()), "FROZEN_TAB");
         require(liquidatedVaults[_vaultId].auctionAddr == address(0), "LIQUIDATED");
         vaultKeeper.pushVaultRiskPenalty(_vaultOwner, _vaultId);
 
@@ -230,6 +244,11 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
         emit TabWithdraw(_vaultOwner, _vaultId, _tabAmt, v.tabAmt);
     }
 
+    /**
+     * @dev Return back Tab to vault. Call `approve` on Tab contract before calling `paybackTab`.
+     * @param _vaultId Vault ID.
+     * @param _tabAmt Tab amount to pay back. Required allowance to spend the tab amount.
+     */
     function paybackTab(
         uint256 _vaultId, 
         uint256 _tabAmt
@@ -246,7 +265,7 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
                 revert InvalidVault(_vaultOwner, _vaultId);
             }
         } else {
-            require(ITabRegistry(tabRegistry).frozenTabs(ITabERC20(v.tab).tabCode()) == false, "FROZEN_TAB");
+            require(!ITabRegistry(tabRegistry).frozenTabs(ITabERC20(v.tab).tabCode()), "FROZEN_TAB");
             require(liquidatedVaults[_vaultId].auctionAddr == address(0), "LIQUIDATED");
             vaultKeeper.pushVaultRiskPenalty(_vaultOwner, _vaultId);
         }
@@ -277,6 +296,13 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
         emit TabReturned(_vaultOwner, _vaultId, _tabAmt, v.tabAmt);
     }
 
+    /**
+     * @dev Withdraw reserve from vault. Vault reserve ratio will drop and may be charged risk penalty
+     * if reserve ratio dropped below configured threshold.
+     * @param _vaultId Vault ID.
+     * @param _reserveAmt Withdrawal amount.
+     * @param sigPrice Signed Tab rate by authorized oracle service.
+     */
     function withdrawReserve(
         uint256 _vaultId, 
         uint256 _reserveAmt, 
@@ -292,7 +318,7 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
             revert InvalidVault(_vaultOwner, _vaultId);
     
         require(_reserveAmt <= v.reserveAmt, "EXCEED_RESERVE");
-        require(ITabRegistry(tabRegistry).frozenTabs(ITabERC20(v.tab).tabCode()) == false, "FROZEN_TAB");
+        require(!ITabRegistry(tabRegistry).frozenTabs(ITabERC20(v.tab).tabCode()), "FROZEN_TAB");
         vaultKeeper.pushVaultRiskPenalty(_vaultOwner, _vaultId);
     
         (
@@ -328,6 +354,11 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
         emit ReserveWithdraw(_vaultOwner, _vaultId, reserveAmt18, v.reserveAmt);
     }
 
+    /**
+     * @dev Deposit and increase vault reserve.
+     * @param _vaultId Vault ID.
+     * @param _reserveAmt Reserve amount to deposit.
+     */
     function depositReserve(
         uint256 _vaultId, 
         uint256 _reserveAmt
@@ -346,7 +377,7 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
                 revert InvalidVault(_vaultOwner, _vaultId);
             }
         } else {
-            require(ITabRegistry(tabRegistry).frozenTabs(ITabERC20(v.tab).tabCode()) == false, "FROZEN_TAB");
+            require(!ITabRegistry(tabRegistry).frozenTabs(ITabERC20(v.tab).tabCode()), "FROZEN_TAB");
             vaultKeeper.pushVaultRiskPenalty(_vaultOwner, _vaultId);
         }
 
@@ -377,6 +408,12 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
         emit ReserveAdded(_vaultOwner, _vaultId, reserveAmt18, v.reserveAmt);
     }
 
+    /**
+     * @dev Called by `VaultKeeper` to charge risk penalty amount into corresponding vault.
+     * @param _vaultOwner Vault Owner address.
+     * @param _vaultId Vault ID.
+     * @param _amt Risk penalty amount.
+     */
     function chargeRiskPenalty(address _vaultOwner, uint256 _vaultId, uint256 _amt) external onlyRole(KEEPER_ROLE) {
         Vault storage v = vaults[_vaultOwner][_vaultId];
         require(v.tabAmt > 0, "INVALID_VAULT");
@@ -442,7 +479,6 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
             ,
         ) = reserveRegistry.getReserveByAddr(v.reserveAddr, v.reserveAmt);
         require(reserveAmt > 0, "INVALID_RESERVE");
-        // address reserveSafe = reserveRegistry.reserveAddrSafe(v.reserveAddr);
         require(IReserveSafe(reserveSafe).unlockReserve(auctionManager, reserveAmt), "RESERVE_APPROVAL");
 
         v.reserveAmt = 0;
@@ -523,7 +559,7 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
             ITabERC20(tabAddr).mint(config.treasury(), data.tabToMint);
         }
 
-        for (uint256 i = 0; i < addrs.length; i = unsafe_inc(i)) {
+        for (uint256 i; i < addrs.length; i = unsafe_inc(i)) {
             if (addrs[i] == address(0))
                 break;
             (
@@ -570,7 +606,7 @@ contract VaultManager is Initializable, AccessControlDefaultAdminRulesUpgradeabl
         return msg.sender;
     }
 
-    function findMatchedAddr(address[] memory _addr, address _toMatch) internal pure returns (int256 index) {
+    function findMatchedAddr(address[] memory _addr, address _toMatch) internal pure returns (int256) {
         for (uint256 j = 0; j < _addr.length; j = unsafe_inc(j)) {
             if (_addr[j] == _toMatch) {
                 return int256(j);

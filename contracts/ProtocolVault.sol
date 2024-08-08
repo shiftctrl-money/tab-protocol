@@ -9,6 +9,10 @@ import "./shared/interfaces/IReserveRegistry.sol";
 import "lib/solady/src/utils/FixedPointMathLib.sol";
 import "lib/solady/src/utils/SafeTransferLib.sol";
 
+/**
+ * @title  Manage buy/sell transaction on post Ctl-Alt-Del Tab.
+ * @notice Refer https://www.shiftctrl.money for details.
+ */
 contract ProtocolVault is Initializable, AccessControlDefaultAdminRulesUpgradeable, UUPSUpgradeable {
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
@@ -74,7 +78,13 @@ contract ProtocolVault is Initializable, AccessControlDefaultAdminRulesUpgradeab
         reserveRegistry = _reserveRegistry;
     }
 
-    /// @dev Mint Tabs. Required allowance on user's BTC reserve. User pays BTC(_reserveAmt) to get TAB.
+    /**
+     * 
+     * @dev Mint Tabs. Required allowance on user's BTC reserve. User pays BTC `_reserveAmt` to buy Tab.
+     * @param _reserveAddr Reserve contract address.
+     * @param _tabAddr Tab contract address.
+     * @param _reserveAmt Reserve amount to spend to buy Tab. Required allowance on reserve before calling `buyTab`.
+     */
     function buyTab(address _reserveAddr, address _tabAddr, uint256 _reserveAmt) external returns (uint256) {
         PVault storage vault = vaults[_reserveAddr][_tabAddr];
         require(vault.price > 0, "INVALID_VAULT");
@@ -95,7 +105,13 @@ contract ProtocolVault is Initializable, AccessControlDefaultAdminRulesUpgradeab
         return tabAmt;
     }
 
-    /// @dev Withdraw reserves. Required allowance on TAB. User gets BTC from selling(burning) TAB(_tabAmt)
+    /**
+     * 
+     * @dev Withdraw reserves. Required allowance on Tab. User gets BTC from selling(burning) tab `_tabAmt`
+     * @param _reserveAddr Reserve contract address.
+     * @param _tabAddr Tab contract address.
+     * @param _tabAmt Tab amount to spend to get BTC. Required allowance on Tab before calling `sellTab`.
+     */
     function sellTab(address _reserveAddr, address _tabAddr, uint256 _tabAmt) external returns (uint256) {
         PVault storage vault = vaults[_reserveAddr][_tabAddr];
         require(vault.price > 0, "INVALID_VAULT");

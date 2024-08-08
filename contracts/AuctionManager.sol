@@ -8,6 +8,10 @@ import { SafeTransferLib } from "lib/solady/src/utils/SafeTransferLib.sol";
 import { AccessControlDefaultAdminRules } from "@openzeppelin/contracts/access/AccessControlDefaultAdminRules.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
+/**
+ * @title  Auction off BTC reserves on liquidating vault to recover outstanding Tabs.
+ * @notice Refer https://www.shiftctrl.money for details.
+ */
 contract AuctionManager is AccessControlDefaultAdminRules, ReentrancyGuard {
 
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
@@ -150,6 +154,14 @@ contract AuctionManager is AccessControlDefaultAdminRules, ReentrancyGuard {
         );
     }
 
+    /**
+     * @notice User pays Tabs to bid on discounted BTC.
+     * @dev Required allowance to spend Tabs. Before calling `bid`, call `approve` on Tab contract 
+     * to allow 'AuctionManager' contract to spend Tabs.
+     * @param auctionId Unique auction ID.
+     * @param bidQty BTC Bid Quantity/Amount. If `bidQty` exceeds available BTC quantity, 
+     * `bidQty` will set to available BTC quantity.
+     */
     function bid(uint256 auctionId, uint256 bidQty) external nonReentrant {
         AuctionState storage state = auctionState[auctionId];
         AuctionDetails storage det = auctionDetails[auctionId];

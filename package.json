@@ -18,8 +18,7 @@
   "devDependencies": {
     "@openzeppelin/contracts": "^4.9.2",
     "@openzeppelin/contracts-upgradeable": "^4.9.3",
-    "@openzeppelin/hardhat-upgrades": "^2.2.1",
-    "ethers": "^6.6.5"
+    "ethers": "^6.13.1"
   },
   "dependencies": {
     "forge-std": "github:foundry-rs/forge-std#v1.6.0",

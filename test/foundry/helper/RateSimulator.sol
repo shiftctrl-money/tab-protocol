@@ -358,42 +358,42 @@ contract RateSimulator {
         require(x <= 168, "Exceeded maximum supported tab count!");
         t = new bytes3[](x);
         p = new uint256[](x);
-        for (uint256 i = 0; i < x; i++) {
+        for (uint256 i = 0; i < x; ++i) {
             t[i] = _tabs[i];
             p[i] = FixedPointMathLib.fullMulDiv(_prices[i], diff, 100);
         }
     }
 
     function retrieve10(uint256 diff) public view returns (bytes3[10] memory t, uint256[10] memory p) {
-        for (uint256 i = 0; i < 10; i++) {
+        for (uint256 i = 0; i < 10; ++i) {
             t[i] = _tabs[i];
             p[i] = FixedPointMathLib.fullMulDiv(_prices[i], diff, 100);
         }
     }
 
     function retrieve20(uint256 diff) public view returns (bytes3[20] memory t, uint256[20] memory p) {
-        for (uint256 i = 0; i < 20; i++) {
+        for (uint256 i = 0; i < 20; ++i) {
             t[i] = _tabs[i];
             p[i] = FixedPointMathLib.fullMulDiv(_prices[i], diff, 100);
         }
     }
 
     function retrieve100(uint256 diff) public view returns (bytes3[100] memory t, uint256[100] memory p) {
-        for (uint256 i = 0; i < 100; i++) {
+        for (uint256 i = 0; i < 100; ++i) {
             t[i] = _tabs[i];
             p[i] = FixedPointMathLib.fullMulDiv(_prices[i], diff, 100);
         }
     }
 
     function retrieve140(uint256 diff) public view returns (bytes3[140] memory t, uint256[140] memory p) {
-        for (uint256 i = 0; i < 140; i++) {
+        for (uint256 i = 0; i < 140; ++i) {
             t[i] = _tabs[i];
             p[i] = FixedPointMathLib.fullMulDiv(_prices[i], diff, 100);
         }
     }
 
     function retrieve160(uint256 diff) public view returns (bytes3[160] memory t, uint256[160] memory p) {
-        for (uint256 i = 0; i < 160; i++) {
+        for (uint256 i = 0; i < 160; ++i) {
             t[i] = _tabs[i];
             p[i] = FixedPointMathLib.fullMulDiv(_prices[i], diff, 100);
         }

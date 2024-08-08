@@ -7,7 +7,7 @@ import "forge-std/console.sol";
 
 import "./Deployer.t.sol";
 import { IERC20 } from "../../contracts/shared/interfaces/IERC20.sol";
-import { DssVestMintable } from "../../contracts/DssVest.sol";
+import { DssVestMintable } from "./DssVest.sol";
 
 contract DssVestMintableTest is Test, Deployer {
 

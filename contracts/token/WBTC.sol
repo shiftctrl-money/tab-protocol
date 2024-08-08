@@ -8,6 +8,10 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUp
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
+/**
+ * @title Simulate WBTC for testing purpose. 
+ * @notice Refer https://www.shiftctrl.money for details.
+ */
 contract WBTC is
     Initializable,
     ERC20Upgradeable,

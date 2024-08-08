@@ -8,6 +8,10 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUp
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
+/**
+ * @title ShiftCTRL Protocol's Wrapped BTC contract to replace WBTC.
+ * @notice Refer https://www.shiftctrl.money for details.
+ */
 contract CBTC is
     Initializable,
     ERC20Upgradeable,
