@@ -5,9 +5,12 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlDefaultAdminRulesUpgradeable.sol";
 import "lib/solady/src/utils/FixedPointMathLib.sol";
-import "./oracle/interfaces/IPriceOracle.sol";
 import "./shared/interfaces/IVaultManager.sol";
 
+/**
+ * @title  Track and charge risk penalty, and liquidate vault if reserve ratio fall below configured threshold.
+ * @notice Refer https://www.shiftctrl.money for details. 
+ */
 contract VaultKeeper is Initializable, AccessControlDefaultAdminRulesUpgradeable, UUPSUpgradeable {
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
@@ -180,7 +183,7 @@ contract VaultKeeper is Initializable, AccessControlDefaultAdminRulesUpgradeable
     }
 
     /**
-     * @dev Triggered by relayer when price is updated.
+     * @dev Triggered by offchain service on fixed interval.
      * Pass in vaults details to calculate latest reserve ratio
      * If 120 < Reserve Ratio < 180 , calculate risk penalty
      * If Reserve Ratio < 120 , emit VaultLiquidation

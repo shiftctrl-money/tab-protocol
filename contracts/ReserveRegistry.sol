@@ -5,6 +5,10 @@ import "@openzeppelin/contracts/access/AccessControlDefaultAdminRules.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
+/**
+ * @title  Authorize and manage reserve contract used by protocol to back Tabs.
+ * @notice Refer https://www.shiftctrl.money for details.
+ */
 contract ReserveRegistry is AccessControlDefaultAdminRules {
 
     bytes32 public constant MAINTAINER_ROLE = keccak256("MAINTAINER_ROLE");
@@ -86,7 +90,14 @@ contract ReserveRegistry is AccessControlDefaultAdminRules {
         );
     }
 
-    /// @dev Get reserve amount(quantity) in the reserve token's decimal value
+    /**
+     * 
+     * @dev Get reserve amount(quantity) in the reserve token's decimal value.
+     * @param _reserveContractAddr Reserve contract address.
+     * @param _amt Value to be converted into reserve contract's decimal setting.
+     * @return valueInOriDecimal Value in the reserve contract's decimal setting (e.g. 8)
+     * @return valueInDec18 Value in 18 decimals.
+     */
     function getOriReserveAmt(address _reserveContractAddr, uint256 _amt) public view returns(uint256 valueInOriDecimal, uint256 valueInDec18) {
         require(enabledReserve[reserveKey[_reserveContractAddr]], "DISABLED_RESERVE");
         valueInOriDecimal = _amt;

@@ -10,6 +10,10 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20CappedUp
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
+/**
+ * @title ShiftCTRL Protocol governance token.
+ * @notice Refer https://www.shiftctrl.money for details.
+ */
 contract CTRL is
     Initializable,
     ERC20Upgradeable,

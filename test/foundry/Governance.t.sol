@@ -6,7 +6,7 @@ import "forge-std/console.sol";
 
 import "./Deployer.t.sol";
 import { IGovernor } from "@openzeppelin/contracts/governance/IGovernor.sol";
-import { DssVestMintable } from "../../contracts/DssVest.sol";
+import { DssVestMintable } from "./DssVest.sol";
 
 contract GovernanceTest is Test, Deployer {
 

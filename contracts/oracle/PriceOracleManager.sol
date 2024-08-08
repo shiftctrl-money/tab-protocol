@@ -9,6 +9,10 @@ import "lib/solady/src/utils/FixedPointMathLib.sol";
 import "./../shared/interfaces/IERC20.sol";
 import "./interfaces/IPriceOracle.sol";
 
+/**
+ * @title Manage and track performance of authorized oracle providers.
+ * @notice Refer https://www.shiftctrl.money for details.
+ */
 contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgradeable, UUPSUpgradeable {
 
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
@@ -161,6 +165,9 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
     // The {_authorizeUpgrade} function must be overridden to include access restriction to the upgrade mechanism.
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) { }
 
+    /**
+     * @dev Obsolete. `updatePrice` function is replaced by `PriceOracle.updatePrice`.
+     */
     function setOraclePriceSize(uint256 size) external onlyRole(CONFIG_ROLE) {
         ORACLE_PRICE_SIZE = size;
     }
@@ -183,7 +190,7 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
 
     function activeProvider(address _addr) external view returns (bool) {
         OracleProvider memory prv = providers[_addr];
-        return prv.disabledOnBlockId == 0 && prv.disabledTimestamp == 0 && prv.paused == false
+        return prv.disabledOnBlockId == 0 && prv.disabledTimestamp == 0 && !prv.paused
             && block.number >= prv.activatedSinceBlockNum && block.timestamp >= prv.activatedTimestamp;
     }
 
@@ -191,7 +198,7 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
         for (uint256 i = 0; i < providerList.length; i = unsafe_inc(i)) {
             OracleProvider memory prv = providers[providerList[i]];
             if (
-                prv.disabledOnBlockId == 0 && prv.disabledTimestamp == 0 && prv.paused == false
+                prv.disabledOnBlockId == 0 && prv.disabledTimestamp == 0 && !prv.paused
                     && block.number >= prv.activatedSinceBlockNum && block.timestamp >= prv.activatedTimestamp
             ) {
                 x++;
@@ -302,7 +309,7 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
     function resetProviderTracker(address _provider) public onlyRole(MAINTAINER_ROLE) {
         OracleProvider storage prv = providers[_provider];
         require(
-            prv.activatedTimestamp > 0 && prv.disabledOnBlockId == 0 && prv.paused == false,
+            prv.activatedTimestamp > 0 && prv.disabledOnBlockId == 0 && !prv.paused,
             "resetProviderTracker/DISABLED_PROVIDER"
         );
         emit ResetTracker(
@@ -327,7 +334,7 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
      */
     function pauseProvider(address _provider) external onlyRole(MAINTAINER_ROLE) {
         require(
-            providers[_provider].paused == false && providers[_provider].activatedTimestamp > 0,
+            !providers[_provider].paused && providers[_provider].activatedTimestamp > 0,
             "pauseProvider/INVALID_PROVIDER"
         );
         providers[_provider].paused = true;
@@ -336,7 +343,7 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
 
     function unpauseProvider(address _provider) external onlyRole(MAINTAINER_ROLE) {
         require(
-            providers[_provider].paused == true && providers[_provider].activatedTimestamp > 0,
+            providers[_provider].paused && providers[_provider].activatedTimestamp > 0,
             "pauseProvider/INVALID_PROVIDER"
         );
         providers[_provider].paused = false;
@@ -408,7 +415,9 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
         }
     }
 
-    /// @dev scheduler execution - submit accumulated feed count each 24H (or more frequent, e.g. every hour)
+    /**
+     * @dev scheduler execution - submit accumulated feed count each 24H (or more frequent, e.g. every hour)
+     */ 
     function submitProviderFeedCount(
         address[10] calldata _providerList,
         uint256[10] calldata _feedCount,
@@ -426,7 +435,7 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
         for (uint256 i = 0; i < 10; i = unsafe_inc(i)) {
             if (_providerList[i] != address(0)) {
                 prv = providers[_providerList[i]];
-                if (_timestamp > prv.activatedTimestamp && prv.disabledOnBlockId == 0 && prv.paused == false) {
+                if (_timestamp > prv.activatedTimestamp && prv.disabledOnBlockId == 0 && !prv.paused) {
                     info = providerInfo[_providerList[i]];
                     tracker = providerTracker[_providerList[i]];
 
@@ -462,6 +471,11 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
         }
     }
 
+    /**
+     * @dev Obsolete and replaced by `PriceOracle.updatePrice` in operation.
+     * Instead of scheduled batch update of tab rates, user submits vault transaction with 
+     * signed rate update by authorized oracle service.
+     */
     function updatePrice(TabPool[10] calldata _tabPool, CID calldata _cid) external onlyRole(MAINTAINER_ROLE) {
         bytes memory cid = constructCIDv1(_cid.ipfsCID_1, _cid.ipfsCID_2);
         uint256 tabCount = 0;
@@ -473,16 +487,16 @@ contract PriceOracleManager is Initializable, AccessControlDefaultAdminRulesUpgr
         uint256[] memory _prices = new uint256[](ORACLE_PRICE_SIZE);
         uint256[] memory _lastUpdated = new uint256[](ORACLE_PRICE_SIZE);
 
-        for (uint256 i = 0; i < _tabPool.length; i = unsafe_inc(i)) {
+        for (uint256 i; i < _tabPool.length; i = unsafe_inc(i)) {
             _timestamp = _tabPool[i].timestamp;
             if (_timestamp > 0) {
                 // ignore if timestamp == 0, which is placehoolder to fill up TabPool fixed array of 10 items
                 _tab = _tabPool[i].tab;
 
                 // get median value from sorted list
-                uint256 medianValue = 0;
+                uint256 medianValue;
                 uint256[] memory actualMedianList = new uint256[](_tabPool[i].listSize);
-                for (uint256 n = 0; n < _tabPool[i].listSize; n++) {
+                for (uint256 n; n < _tabPool[i].listSize; ++n) {
                     actualMedianList[n] = _tabPool[i].medianList[n];
                 }
                 medianValue = getMedianPrice(actualMedianList);

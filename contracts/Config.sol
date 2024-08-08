@@ -4,6 +4,10 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/access/AccessControlDefaultAdminRules.sol";
 import "./shared/interfaces/IVaultKeeper.sol";
 
+/**
+ * @title  Store and manage protocol-related configurations and parameters.
+ * @notice Refer https://www.shiftctrl.money for details.
+ */
 contract Config is AccessControlDefaultAdminRules {
 
     bytes32 public constant MAINTAINER_ROLE = keccak256("MAINTAINER_ROLE");

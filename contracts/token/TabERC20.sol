@@ -8,6 +8,10 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUp
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
+/**
+ * @title ERC-20 compatible template for all Tabs contracts.
+ * @notice Refer https://www.shiftctrl.money for details.
+ */
 contract TabERC20 is
     Initializable,
     ERC20Upgradeable,

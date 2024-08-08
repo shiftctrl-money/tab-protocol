@@ -8,6 +8,10 @@ import "./shared/interfaces/ITabERC20.sol";
 import "./shared/interfaces/IReserveRegistry.sol";
 import "./shared/interfaces/IConfig.sol";
 
+/**
+ * @title  Utility contract to retrieve vault information.
+ * @notice Refer https://www.shiftctrl.money for details. 
+ */
 contract VaultUtils is Ownable {
     address vaultManager;
 

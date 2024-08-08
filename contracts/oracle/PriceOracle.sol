@@ -7,6 +7,10 @@ import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "lib/solady/src/utils/FixedPointMathLib.sol";
 
+/**
+ * @title Contract to store BTC to Tab rates.
+ * @notice Refer https://www.shiftctrl.money for details.
+ */
 contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdminRules {
 
     bytes32 public constant FEEDER_ROLE = keccak256("FEEDER_ROLE");
@@ -62,6 +66,12 @@ contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdmi
         _unpause();
     }
 
+    /**
+     * @dev Called by governance when external authorized oracle providers are down.
+     * @param tabCode Tab Code.
+     * @param price BTC/TAB Rate.
+     * @param _lastUpdated timestamp of rate update.
+     */
     function setDirectPrice(bytes3 tabCode, uint256 price, uint256 _lastUpdated) external onlyRole(FEEDER_ROLE) {
         _requireNotPaused();
 
@@ -80,9 +90,11 @@ contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdmi
 
     /**
      *
-     * @param _tabs list of tab codes
-     * @param _prices list of tab prices (BTC/TAB price)
-     * @param _lastUpdated list of timestamp value
+     * @dev Batch update of Tab rates from PriceOracleManager. 
+     *      Obsolete and operation is replaced by `updatePrice` function.
+     * @param _tabs List of tab codes.
+     * @param _prices List of tab rates (BTC/TAB price).
+     * @param _lastUpdated List of last updated timestamp value.
      */
     function setPrice(
         bytes3[] calldata _tabs,
@@ -117,6 +129,12 @@ contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdmi
         }
     }
 
+    /**
+     * @dev Replace batch update of tab rate with on-demand tab rate update. 
+     *      When user performs vault operation, the transaction will include 
+     *      latest rate signed by authorized oracle service.
+     * @param priceData Signed Tab rate by authorized oracle service.
+     */
     function updatePrice(UpdatePriceData calldata priceData) external onlyRole(FEEDER_ROLE) returns (uint256) {
         _requireNotPaused();
         if (ctrlAltDelTab[priceData.tab] > 0) {
