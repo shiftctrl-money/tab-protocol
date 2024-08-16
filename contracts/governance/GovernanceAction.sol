@@ -202,6 +202,12 @@ contract GovernanceAction is Initializable, AccessControlDefaultAdminRulesUpgrad
         ITabRegistry(tabRegistryAddress).enableAllTab();
     }
 
+    /**
+     * @dev Call `createNewTab` first on the pegging currency(_ptab), then followed by calling `setPeggedTab`.
+     * @param _ptab Pegging tab currency, rate is based on existing tab.
+     * @param _tab Existing Tab, Tab rate is based on oracle service.
+     * @param _priceRatio BTC/PEGGING_TAB = (BTC/TAB * _priceRatio) / 100
+     */
     function setPeggedTab(bytes3 _ptab, bytes3 _tab, uint256 _priceRatio) external onlyRole(MAINTAINER_ROLE) {
         ITabRegistry(tabRegistryAddress).setPeggedTab(_ptab, _tab, _priceRatio);
         emit PeggedTab(_ptab, _tab, _priceRatio);
