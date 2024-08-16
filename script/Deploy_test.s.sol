@@ -199,7 +199,7 @@ contract Deploy is Script {
         priceOracleManager = deployPriceOracleManager(deployer, deployer, governanceAction, deployer, tabRegistry, tabProxyAdmin);
         console.log("PriceOracleManager: ", priceOracleManager);
 
-        priceOracle = address(new PriceOracle(deployer, deployer, vaultManager, priceOracleManager, tabRegistry));
+        priceOracle = address(new PriceOracle(deployer, deployer, vaultManager, priceOracleManager, tabRegistry, PRICE_RELAYER));
         console.log("PriceOracle: ", priceOracle);
         PriceOracleManager(priceOracleManager).setPriceOracle(priceOracle);
 

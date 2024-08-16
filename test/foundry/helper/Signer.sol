@@ -17,8 +17,8 @@ contract Signer is Test {
     string version;
     uint256 chainid;
 
-    address authorizedAddr;
-    address priceOracle;
+    address public authorizedAddr;
+    address public priceOracle;
     
     uint256 priKey;
 
@@ -29,6 +29,11 @@ contract Signer is Test {
         priKey = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
 
         (,name,version,chainid,,,) = EIP712(priceOracle).eip712Domain();
+    }
+
+    function updateSigner(address _addr, uint256 _prikey) external {
+        authorizedAddr = _addr;
+        priKey = _prikey;
     }
 
     function getUpdatePriceSignature(bytes3 _tab, uint256 _price, uint256 _timestamp) external returns(IPriceOracle.UpdatePriceData memory priceData) {

@@ -29,9 +29,11 @@ contract WBTC is
         _disableInitializers();
     }
 
+    /**
+     * @dev Refer https://etherscan.io/token/0x2260fac5e5542a773aa44fbcfedf7c193bc2c599
+     * Create this in testnet for testing purpose only - mint and lock as vault reserve
+     */
     function initialize(address _admin, address _admin2, address _deployer) public initializer {
-        // Refer https://etherscan.io/token/0x2260fac5e5542a773aa44fbcfedf7c193bc2c599
-        // Create this in testnet for testing purpose only - mint and lock as vault reserve
         __ERC20_init("Token Wrapped BTC", "WBTC");
         __ERC20Burnable_init();
         __AccessControlDefaultAdminRules_init(1 days, _admin);

@@ -57,7 +57,7 @@ Please refer to deployed smart contract addresses below:
 |ReserveSafe (WBTC)							|[0xEc0e4922F4427b06475A5fd3ec729467BbaB8de3](https://sepolia.arbiscan.io/address/0xEc0e4922F4427b06475A5fd3ec729467BbaB8de3)|
 |ReserveSafe (CBTC)	 						|[0x9120c1Cb0c5eBa7946865E1EEa2C584f2865821C](https://sepolia.arbiscan.io/address/0x9120c1Cb0c5eBa7946865E1EEa2C584f2865821C)|
 |PriceOracleManager							|[0xcfE44C253C9b37FDD54d36C600D33Cbf3edfA5B7](https://sepolia.arbiscan.io/address/0xcfE44C253C9b37FDD54d36C600D33Cbf3edfA5B7)|
-|PriceOracle								|[0x4a6D701F5CD7605be2eC9EA1D945f07D8DdbD1f0](https://sepolia.arbiscan.io/address/0x4a6D701F5CD7605be2eC9EA1D945f07D8DdbD1f0)|
+|PriceOracle								|[0xad5Da1fCb920914AD5523aA62ca0e0686671670f](https://sepolia.arbiscan.io/address/0xad5Da1fCb920914AD5523aA62ca0e0686671670f)|
 |VaultKeeper								|[0xd67937ca4d249a4caC262B18c3cCB747042Dd51B](https://sepolia.arbiscan.io/address/0xd67937ca4d249a4caC262B18c3cCB747042Dd51B)|
 |ProtocolVault 								|[0x67E332459A81F3d64142829541b6fec608356B63](https://sepolia.arbiscan.io/address/0x67E332459A81F3d64142829541b6fec608356B63)|
 

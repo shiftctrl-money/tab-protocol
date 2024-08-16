@@ -100,7 +100,7 @@ contract DeployTestnetv2 is Script {
         PriceOracleManager(priceOracleManager).setDefBlockGenerationTimeInSecond(1);
         // TODO (emergencyGovernor): GovernanceAction.setDefBlockGenerationTimeInSecond(1)
 
-        priceOracle = address(new PriceOracle(governanceTimelockController, emergencyTimelockController, vaultManager, priceOracleManager, tabRegistry));
+        priceOracle = address(new PriceOracle(governanceTimelockController, emergencyTimelockController, vaultManager, priceOracleManager, tabRegistry, PRICE_RELAYER));
         console.log("PriceOracle: ", priceOracle);
         PriceOracleManager(priceOracleManager).setPriceOracle(priceOracle);
 
