@@ -36,6 +36,7 @@ contract Deploy is Script {
     bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
     bytes32 public constant CANCELLER_ROLE = keccak256("CANCELLER_ROLE");
     bytes32 public constant USER_ROLE = keccak256("USER_ROLE");
+    bytes32 public constant MAINTAINER_ROLE = keccak256("MAINTAINER_ROLE");
 
     bytes32 reserve_cBTC = keccak256("CBTC");
 
@@ -120,6 +121,8 @@ contract Deploy is Script {
         console.log("ShiftCtrlGovernor: ", shiftCtrlGovernor);
         console.log("ShiftCtrlEmergencyGovernor: ", shiftCtrlEmergencyGovernor);
 
+        TabProxyAdmin(ctrlProxyAdmin).transferOwnership(address(governanceTimelockController));
+
         cBTCProxyAdmin = address(new TabProxyAdmin(deployer));
         cBTC = deployCBTC(governanceTimelockController, emergencyTimelockController, deployer, cBTCProxyAdmin);
         console.log("cBTC Proxy Admin: ", cBTCProxyAdmin);
@@ -168,7 +171,7 @@ contract Deploy is Script {
         priceOracleManager = deployPriceOracleManager(governanceTimelockController, emergencyTimelockController, governanceAction, deployer, tabRegistry, tabProxyAdmin);
         console.log("PriceOracleManager: ", priceOracleManager);
 
-        priceOracle = address(new PriceOracle(governanceTimelockController, emergencyTimelockController, vaultManager, priceOracleManager, tabRegistry));
+        priceOracle = address(new PriceOracle(governanceTimelockController, emergencyTimelockController, vaultManager, priceOracleManager, tabRegistry, PRICE_RELAYER));
         console.log("PriceOracle: ", priceOracle);
         PriceOracleManager(priceOracleManager).setPriceOracle(priceOracle);
 
@@ -202,14 +205,17 @@ contract Deploy is Script {
 
         // Revokes permission
         VaultManager(vaultManager).renounceRole(keccak256("DEPLOYER_ROLE"), deployer);
-
-        GovernanceAction(governanceAction).renounceRole(keccak256("MAINTAINER_ROLE"), deployer);
+        GovernanceAction(governanceAction).renounceRole(MAINTAINER_ROLE, deployer);
+        TabRegistry(tabRegistry).renounceRole(MAINTAINER_ROLE, deployer);
+        ReserveRegistry(reserveRegistry).renounceRole(MAINTAINER_ROLE, deployer);
+        Config(config).renounceRole(MAINTAINER_ROLE, deployer);
+        PriceOracleManager(priceOracleManager).renounceRole(MAINTAINER_ROLE, deployer);
+        VaultKeeper(vaultKeeper).renounceRole(keccak256("DEPLOYER_ROLE"), deployer);
 
         CTRL(ctrl).grantRole(keccak256("UPGRADER_ROLE"), governanceTimelockController);
         CTRL(ctrl).grantRole(keccak256("UPGRADER_ROLE"), emergencyTimelockController);
         CTRL(ctrl).beginDefaultAdminTransfer(governanceTimelockController);
             // governance to call acceptDefaultAdminTransfer
-            // governance to call TabRegistry(tabRegistry).grantRole(USER_ROLE, UI_USER);
 
         vm.stopBroadcast();
     }

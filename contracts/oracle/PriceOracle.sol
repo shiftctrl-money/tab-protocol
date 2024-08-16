@@ -41,7 +41,8 @@ contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdmi
         address _admin2,
         address _vaultManager,
         address _priceOracleManager,
-        address _tabRegistry
+        address _tabRegistry,
+        address _authorizedCaller
     )
         EIP712("PriceOracle", "1") 
         AccessControlDefaultAdminRules(1 days, _admin)
@@ -50,6 +51,7 @@ contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdmi
         _grantRole(FEEDER_ROLE, _admin2);
         _grantRole(FEEDER_ROLE, _priceOracleManager);
         _grantRole(FEEDER_ROLE, _vaultManager);
+        _grantRole(FEEDER_ROLE, _authorizedCaller);
 
         _grantRole(PAUSER_ROLE, _admin);
         _grantRole(PAUSER_ROLE, _admin2);
@@ -155,18 +157,33 @@ contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdmi
             address signer = ECDSA.recover(_hashTypedDataV4(structHash), priceData.v, priceData.r, priceData.s);
 
             require(signer == priceData.owner, "INVALID_SIGNATURE"); // signed by authorized price provider
+            require(hasRole(FEEDER_ROLE, signer), "INVALID_ROLE");
             require(block.timestamp <= (priceData.timestamp + inactivePeriod), "EXPIRED");
             
             nonces[priceData.updater] += 1;
 
-            if (priceData.price == prices[priceData.tab])
-                return priceData.price;
-            else {
-                emit UpdatedPrice(priceData.tab, prices[priceData.tab], priceData.price, priceData.timestamp);
-                prices[priceData.tab] = priceData.price;
-                lastUpdated[priceData.tab] = priceData.timestamp;
-                
-                return priceData.price;
+            if (peggedTabMap[priceData.tab] == 0x0) {
+                if (priceData.price == prices[priceData.tab])
+                    return priceData.price;
+                else {
+                    emit UpdatedPrice(priceData.tab, prices[priceData.tab], priceData.price, priceData.timestamp);
+                    prices[priceData.tab] = priceData.price;
+                    lastUpdated[priceData.tab] = priceData.timestamp;
+                    
+                    return priceData.price;
+                }
+            } else { // update pegged price's tab based on oracle pegged rate
+                bytes3 peggedTab = peggedTabMap[priceData.tab];
+                uint256 peggedTabRate = FixedPointMathLib.mulDiv(priceData.price, 100, peggedTabPriceRatio[priceData.tab]);
+                if (peggedTabRate == prices[peggedTab])
+                    return priceData.price;
+                else {
+                    emit UpdatedPrice(peggedTab, prices[peggedTab], peggedTabRate, priceData.timestamp);
+                    prices[peggedTab] = peggedTabRate;
+                    lastUpdated[peggedTab] = priceData.timestamp;
+                    
+                    return priceData.price;
+                }
             }
         } else {
             return _getPrice(priceData.tab);

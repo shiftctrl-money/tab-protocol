@@ -45,6 +45,7 @@ abstract contract Deployer {
 
     address public owner;
     Signer signer;
+    address signerAuthorizedAddr = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
     address[] public eoa_accounts;
 
     TabProxyAdmin cBTCProxyAdmin;
@@ -210,7 +211,7 @@ abstract contract Deployer {
             )
         );
 
-        priceOracle = new PriceOracle(owner, owner, address(vaultManager), priceOracleManagerAddr, address(tabRegistry));
+        priceOracle = new PriceOracle(owner, owner, address(vaultManager), priceOracleManagerAddr, address(tabRegistry), signerAuthorizedAddr);
 
         IPriceOracleManager(priceOracleManagerAddr).setPriceOracle(address(priceOracle));
 

@@ -28,6 +28,7 @@ contract TabRegistryTest is Test {
     address public dummyDefaultTabContract = address(2);
     address public dummyTabProxyAdmin = address(3);
     address public dummyAuctionManager = address(4);
+    address signerAuthorizedAddr = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
 
     bytes3[] addedTabs; // Keep track of tabs added during tests
 
@@ -72,7 +73,7 @@ contract TabRegistryTest is Test {
             address(new TransparentUpgradeableProxy(address(priceOracleManager), address(tabProxyAdmin), initData));
 
         priceOracle = new PriceOracle(
-            address(this), address(this), dummyVaultManager, priceOracleManagerProxy, address(tabRegistry)
+            address(this), address(this), dummyVaultManager, priceOracleManagerProxy, address(tabRegistry), signerAuthorizedAddr
         );
         PriceOracleManager(priceOracleManagerProxy).setPriceOracle(address(priceOracle));
 
