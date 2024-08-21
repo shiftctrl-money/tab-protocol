@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.25;
 
 import { Deployer } from "./Deployer.t.sol";
 import { IAuctionManager } from "../../contracts/shared/interfaces/IAuctionManager.sol";

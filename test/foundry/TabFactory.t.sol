@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.25;
 
 import { TabRegistry } from "../../contracts/TabRegistry.sol";
 import { TabFactory } from "../../contracts/TabFactory.sol";

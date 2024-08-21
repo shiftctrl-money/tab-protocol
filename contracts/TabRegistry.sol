@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.25;
 
 import { IPriceOracleManager } from "./oracle/interfaces/IPriceOracleManager.sol";
 import { IPriceOracle } from "./oracle/interfaces/IPriceOracle.sol";
@@ -140,7 +140,7 @@ contract TabRegistry is AccessControlDefaultAdminRules {
     }
 
     /**
-     *
+     * @dev Create the new pegging tab first via governance, before calling setPeggedTab.
      * @param _ptab Pegged Tab Code
      * @param _tab Pegging to this tab (existing TAB)
      * @param _priceRatio Value 100 represents 100% value of the pegged price. E.g store 50 if ABC is 50% value of USD

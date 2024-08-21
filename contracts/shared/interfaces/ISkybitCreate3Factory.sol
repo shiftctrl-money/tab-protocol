@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.25;
 
 /// @dev https://github.com/SKYBITDev3/SKYBIT-Keyless-Deployment
 interface ISkybitCreate3Factory {
