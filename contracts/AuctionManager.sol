@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.25;
 
 import { IVaultManager } from "./shared/interfaces/IVaultManager.sol";
 import { IReserveRegistry } from "./shared/interfaces/IReserveRegistry.sol";

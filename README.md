@@ -1,7 +1,7 @@
 # Tab Protocol
 [ShiftCTRL](https://shiftctrl.money) is a decentralised stablecoin protocol anchored to Bitcoin. 
 
-It allows users to mint stablecoins termed as Tabs, that are pegged to any of the 156 national currencies globally, by depositing reserves in the form of Bitcoin.
+It allows users to mint stablecoins termed as Tabs, that are pegged to any of the 155 national currencies globally, by depositing reserves in the form of Bitcoin.
 
 ## Getting Started
 1. Visit [ShiftCTRL homepage](https://shiftctrl.money) for news and information.
