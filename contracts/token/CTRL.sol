@@ -1,30 +1,35 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+// Compatible with OpenZeppelin Contracts ^5.0.0
+pragma solidity 0.8.26;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlDefaultAdminRulesUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20CappedUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import { ERC20BurnableUpgradeable } from 
+    "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
+import { AccessControlDefaultAdminRulesUpgradeable } from 
+    "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
+import { ERC20PermitUpgradeable } from 
+    "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
+import { ERC20VotesUpgradeable } from 
+    "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20VotesUpgradeable.sol";
+import { ERC20CappedUpgradeable } from 
+    "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20CappedUpgradeable.sol";
+import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 /**
- * @title ShiftCTRL Protocol governance token.
+ * @title Governance token of ShiftCTRL Protocol.
  * @notice Refer https://www.shiftctrl.money for details.
  */
-contract CTRL is
-    Initializable,
-    ERC20Upgradeable,
-    ERC20BurnableUpgradeable,
-    AccessControlDefaultAdminRulesUpgradeable,
-    ERC20PermitUpgradeable,
-    ERC20VotesUpgradeable,
-    ERC20CappedUpgradeable,
-    UUPSUpgradeable
+contract CTRL is 
+    Initializable, 
+    ERC20Upgradeable, 
+    ERC20BurnableUpgradeable, 
+    AccessControlUpgradeable, 
+    ERC20PermitUpgradeable, 
+    ERC20VotesUpgradeable, 
+    ERC20CappedUpgradeable, 
+    UUPSUpgradeable 
 {
-
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
@@ -33,59 +38,57 @@ contract CTRL is
         _disableInitializers();
     }
 
-    function initialize(address _deployer) public initializer {
+    function initialize(address defaultAdmin, address minter, address upgrader)
+        initializer public
+    {
         __ERC20_init("shiftCTRL", "CTRL");
         __ERC20Burnable_init();
-        __AccessControlDefaultAdminRules_init(1 days, _deployer);
+        __AccessControlDefaultAdminRules_init(1 days, defaultAdmin);
         __ERC20Permit_init("shiftCTRL");
         __ERC20Votes_init();
         __ERC20Capped_init(10 ** 9 * 10 ** 18); // value 1000000000000000000000000000
         // CAP = 1 billion = 1,000,000,000
         __UUPSUpgradeable_init();
 
-        _grantRole(UPGRADER_ROLE, _deployer);
-
-        _grantRole(MINTER_ROLE, _deployer);
+        _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
+        _grantRole(MINTER_ROLE, minter);
+        _grantRole(UPGRADER_ROLE, upgrader);
     }
 
     function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
         _mint(to, amount);
     }
 
-    function clock() public view override returns (uint48) {
+    function clock() public view override returns(uint48) {
         return uint48(block.timestamp);
     }
 
     // solhint-disable-next-line func-name-mixedcase
-    function CLOCK_MODE() public pure override returns (string memory) {
+    function CLOCK_MODE() public pure override returns(string memory) {
         return "mode=timestamp";
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) { }
+    function _authorizeUpgrade(address newImplementation)
+    internal
+    onlyRole(UPGRADER_ROLE)
+    override
+    { }
 
-    function _afterTokenTransfer(
-        address from,
-        address to,
-        uint256 amount
-    )
-        internal
-        override(ERC20Upgradeable, ERC20VotesUpgradeable)
+    // The following functions are overrides required by Solidity.
+
+    function _update(address from, address to, uint256 value)
+    internal
+    override(ERC20Upgradeable, ERC20VotesUpgradeable)
     {
-        super._afterTokenTransfer(from, to, amount);
+        super._update(from, to, value);
     }
 
-    function _mint(
-        address to,
-        uint256 amount
-    )
-        internal
-        override(ERC20Upgradeable, ERC20VotesUpgradeable, ERC20CappedUpgradeable)
+    function nonces(address owner)
+    public
+    view
+    override(ERC20PermitUpgradeable, NoncesUpgradeable)
+    returns(uint256)
     {
-        super._mint(to, amount);
+        return super.nonces(owner);
     }
-
-    function _burn(address account, uint256 amount) internal override(ERC20Upgradeable, ERC20VotesUpgradeable) {
-        super._burn(account, amount);
-    }
-
 }

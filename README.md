@@ -11,7 +11,7 @@ It allows users to mint stablecoins termed as Tabs, that are pegged to any of th
 ### Prerequisites
 1. Foundry
 2. Node.js and npm
-3. Solidity compiler ``` npm install -g solc@0.8.25 ```
+3. Solidity compiler ``` npm install -g solc@0.8.28 ```
 
 ### Installation
 1. Install [Foundry](https://book.getfoundry.sh/getting-started/installation) and [NodeJS v16.20+](https://nodejs.org/)
