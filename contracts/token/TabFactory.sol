@@ -1,71 +1,81 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity 0.8.28;
 
-import { AccessControlDefaultAdminRules } from "@openzeppelin/contracts/access/extensions/AccessControlDefaultAdminRules.sol";
-import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import { Create2 } from "@openzeppelin/contracts/utils/Create2.sol";
-import { TabERC20 } from "./TabERC20.sol";
+import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import {CREATE3} from "lib/solady/src/utils/CREATE3.sol";
+import {TabERC20} from "./TabERC20.sol";
 
 /**
- * @dev Dependency on https://github.com/SKYBITDev3/SKYBIT-Keyless-Deployment to create fixed TabFactory contract address.
+ * @dev Dependency on https://github.com/SKYBITDev3/SKYBIT-Keyless-Deployment to create fixed contract address.
  * @title  Factory to create new Tab contract.
  * @notice Refer https://www.shiftctrl.money for details.
  */
-contract TabFactory is AccessControlDefaultAdminRules {
-    bytes32 public constant DEPLOY_ROLE = keccak256("DEPLOY_ROLE");
-    TabERC20 tabERC20;
-    event UpdatedTabContractTemplate(address oldAddr, address newAddr);
+contract TabFactory is UpgradeableBeacon {
+    address public tabRegistry;
+
+    event UpdatedTabRegistry(address _from, address _to);
+    event NewTabBeaconProxy(string _symbol, address addr);
+
+    error Unauthorized();
     error ZeroAddress();
 
-    /**
-     * @param admin Super administrator.
-     * @param minter Contract authorized to mint Tabs.
-     */
-    constructor(address admin, address minter) AccessControlDefaultAdminRules(1 days, admin) {
-        _grantRole(DEPLOY_ROLE, admin);
-        _grantRole(DEPLOY_ROLE, minter);
-        tabERC20 = new TabERC20();
+    modifier onlyTabRegistry() {
+        _checkUser();
+        _;
     }
 
     /**
-     * @dev Update Tab implementation address.
-     * @param newTabAddr Deployed tab implementation.
+     * @dev Deploy `TabFactory` on same contract address across all Tab-supported EVM chains,
+     * so that `BeaconProxy` (Tab) contracts created from the factory having consistent addresses.
+     * @param _implementation Implementation of `TabERC20` contract shared by all Tab implementations.
+     * On first deployment, use a temp/fixed address (for example, SKYBIT factory contract) 
+     * to ensure same `TabFactory` bytecodes are deployed.
+     * Call `upgradeTo` to update implementation once TabERC20 contract is deployed.
+     * @param _initialOwner Expect governance controller. Authorized to update implementation contract.
      */
-    function changeTabERC20Addr(address newTabAddr) external onlyRole(DEPLOY_ROLE) {
-        if (newTabAddr == address(0))
+    constructor(
+        address _implementation, 
+        address _initialOwner
+    ) UpgradeableBeacon(_implementation, _initialOwner) {}
+
+    /**
+     * @dev Call this to set tab registry contract address.
+     * @param _newAddr Tab registry address.
+     */
+    function updateTabRegistry(address _newAddr) external onlyOwner {
+        if (_newAddr == address(0))
             revert ZeroAddress();
-        emit UpdatedTabContractTemplate(address(tabERC20), newTabAddr);
-        tabERC20 = TabERC20(newTabAddr);
+        emit UpdatedTabRegistry(tabRegistry, _newAddr);
+        tabRegistry = _newAddr;
     }
 
-    /**
-     * @dev Create a proxy from stored tab implementation.
-     * @param name Tab name, e.g. Sound USD.
-     * @param symbol Tab symbol, e.g. sXXX.
-     * @param admin Admin user of the tab token.
-     * @param minter User authorized to mint tabs.
-     * @param tabProxyAdmin Proxy admin.
-     */
     function createTab(
-        string calldata name,
-        string calldata symbol,
-        address admin,
-        address minter,
-        address tabProxyAdmin
+        address _admin,
+        address _vaultManager,
+        string memory _name,
+        string memory _symbol
     )
         external
-        onlyRole(DEPLOY_ROLE)
+        onlyTabRegistry
         returns (address)
     {
-        bytes memory deployCode = type(TransparentUpgradeableProxy).creationCode;
-        bytes memory initData = abi.encodeCall(TabERC20.initialize, (name, symbol, admin, tabProxyAdmin, minter));
-        bytes memory params = abi.encode(address(tabERC20), tabProxyAdmin, initData);
-
-        // deploy(uint256 amount, bytes32 salt, bytes memory bytecode)
-        return Create2.deploy(
-            0,
-            keccak256(abi.encodePacked("shiftCTRL TAB_v1: ", symbol)),
-            abi.encodePacked(deployCode, params)
+        bytes memory initData = abi.encodeCall(TabERC20.initialize, (_admin, _vaultManager, _name, _symbol));
+        bytes memory beaconProxyInitParams = abi.encode(address(this), initData);
+        address beaconProxyAddress = CREATE3.deploy(
+            keccak256(abi.encodePacked("ShiftCTRL_v1.00.000: ", _symbol)),
+            abi.encodePacked(type(BeaconProxy).creationCode, beaconProxyInitParams),
+            0
         );
+
+        emit NewTabBeaconProxy(_symbol, beaconProxyAddress);
+        return beaconProxyAddress;
     }
+
+    function _checkUser() internal view {
+        if (msg.sender != tabRegistry) {
+            revert Unauthorized();
+        }
+    }
+
 }

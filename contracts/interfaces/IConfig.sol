@@ -1,36 +1,42 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity 0.8.28;
 
 interface IConfig {
+    struct TabParams {
+        // Default 150 for 1.5% for 1 frame = 24 hours, 
+        //   penalty_amt = delta * riskPenaltyPerFrame
+        uint256 riskPenaltyPerFrame; 
+        // default 0, e.g. set 1 for 0.01% fee when withdrawal & mint tab.
+        //   Fee is add into vault's outstanding tab
+        uint256 processFeeRate; 
+        // default 180
+        uint256 minReserveRatio; 
+        // default 120
+        uint256 liquidationRatio; 
+    }
 
-    function treasury() external view returns (address);
+    struct AuctionParams {
+        uint256 auctionStartPriceDiscount;
+        uint256 auctionStepPriceDiscount;
+        uint256 auctionStepDurationInSec;
+        address auctionManager;
+    }
 
-    function vaultKeeper() external view returns (address);
+    function treasury() external view returns(address);
 
-    function tabRegistry() external view returns (address);
+    function getTabParams(bytes3) external view returns (TabParams memory);
 
-    function reserveParams(bytes32) external view returns (uint256, uint256, uint256);
-
-    function tabParams(bytes3) external view returns (uint256, uint256);
-
-    function auctionParams() external view returns (uint256, uint256, uint256, address);
+    function getAuctionParams() external view returns(AuctionParams memory);
 
     function setVaultKeeperAddress(address _vaultKeeper) external;
 
-    function setReserveParams(
-        bytes32[] calldata _reserveKey,
-        uint256[] calldata _processFeeRate,
-        uint256[] calldata _minReserveRatio,
-        uint256[] calldata _liquidationRatio
-    )
-        external;
+    function setTreasuryAddress(address _treasury) external;
 
     function setDefTabParams(bytes3 _tab) external;
 
     function setTabParams(
         bytes3[] calldata _tab,
-        uint256[] calldata _riskPenaltyPerFrame,
-        uint256[] calldata _processFeeRate
+        TabParams[] calldata _tabParams
     )
         external;
 
@@ -38,8 +44,37 @@ interface IConfig {
         uint256 _auctionStartPriceDiscount,
         uint256 _auctionStepPriceDiscount,
         uint256 _auctionStepDurationInSec,
-        address auctionManager
+        address _auctionManager
     )
         external;
 
+    function tabCodeToTabKey(bytes3 _tab) external pure returns(bytes32);
+
+    event UpdatedVaultKeeperAddress(address b4, address _after);
+    event UpdatedTreasuryAddress(address b4, address _after);
+    event DefaultTabParams(
+        bytes3 tab, 
+        uint256 riskPenaltyPerFrame, 
+        uint256 processFeeRate,
+        uint256 minReserveRatio,
+        uint256 liquidationRatio
+    );
+    event UpdatedTabParams(
+        bytes3 tab, 
+        uint256 riskPenaltyPerFrame, 
+        uint256 processFeeRate,
+        uint256 minReserveRatio,
+        uint256 liquidationRatio
+    );
+    event UpdatedAuctionParams(
+        uint256 auctionStartPriceDiscount,
+        uint256 auctionStepPriceDiscount,
+        uint256 auctionStepDurationInSec,
+        address auctionManager
+    );
+    
+    error ZeroAddress();
+    error InvalidContractAddress();
+    error InvalidArrayLength();
+    error ZeroValue();
 }

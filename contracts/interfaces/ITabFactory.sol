@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity 0.8.28;
 
 interface ITabFactory {
-    function changeTabERC20Addr(address newTabAddr) external;
 
     function createTab(
-        string calldata name,
-        string calldata symbol,
-        address admin,
-        address minter,
-        address tabProxyAdmin
-    ) external returns (address);
+        address _admin,
+        address _vaultManager,
+        string memory _name,
+        string memory _symbol
+    )
+        external
+        returns (address);
+
 }

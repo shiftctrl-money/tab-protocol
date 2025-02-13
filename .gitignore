@@ -138,3 +138,7 @@ out/
 broadcast/
 .openzeppelin/
 .gas-snapshot
+script/localnet/
+test/utils/RateSimulator.sol
+contracts/governance/ShiftCtrlGovernor.sol
+contracts/governance/ShiftCtrlEmergencyGovernor.sol
