@@ -1,101 +1,54 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlDefaultAdminRulesUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "../shared/interfaces/IConfig.sol";
-import "../shared/interfaces/ITabRegistry.sol";
-import "../shared/interfaces/IReserveRegistry.sol";
-import "../ReserveSafe.sol";
-import "../oracle/interfaces/IPriceOracleManager.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {AccessControlDefaultAdminRulesUpgradeable} 
+    from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {IGovernanceAction} from "../interfaces/IGovernanceAction.sol";
+import {IConfig} from "../interfaces/IConfig.sol";
+import {ITabRegistry} from "../interfaces/ITabRegistry.sol";
+import {IReserveRegistry} from "../interfaces/IReserveRegistry.sol";
+import {IPriceOracleManager} from "../interfaces/IPriceOracleManager.sol";
 
-contract GovernanceAction is Initializable, AccessControlDefaultAdminRulesUpgradeable, UUPSUpgradeable {
-
+/// @dev Utility & entry-point contract to perform governance actions.
+contract GovernanceAction is 
+    Initializable, 
+    AccessControlDefaultAdminRulesUpgradeable, 
+    UUPSUpgradeable, 
+    IGovernanceAction 
+{
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant MAINTAINER_ROLE = keccak256("MAINTAINER_ROLE");
 
-    address emergencyGovernanceController;
-    address configAddress;
-    address tabRegistryAddress;
-    address reserveRegistryAddress;
-    address priceOracleManagerAddress;
-
-    struct OracleProvider {
-        uint256 activatedSinceBlockNum;
-        uint256 activatedTimestamp;
-        uint256 disabledOnBlockId;
-        uint256 disabledTimestamp;
-    }
-
-    mapping(address => OracleProvider) public providers;
-    uint256 public defBlockGenerationTimeInSecond;
-
-    // event: Config related
-    event UpdatedDefBlockGenerationTimeInSecond(uint256 b4, uint256 _after);
-    event UpdatedConfig(address old, address _addr);
-    event UpdatedReserveParams(
-        bytes32[] reserve, uint256[] processFeeRate, uint256[] minReserveRatio, uint256[] liquidationRatio
-    );
-    event UpdatedTabParams(bytes3[] tab, uint256[] riskPenaltyPerFrame, uint256[] processFeeRate);
-    event UpdatedAuctionParams(
-        uint256 auctionStartPriceDiscount,
-        uint256 auctionStepPriceDiscount,
-        uint256 auctionStepDurationInSec,
-        address auctionManager
-    );
-
-    // event: Tab related
-    event UpdatedTabRegistry(address old, address _addr);
-
-    // event: Reserve related
-    event UpdatedReserveRegistry(address old, address _addr);
-    event AddedReserve(bytes32 reserveKey, address _addr, address _safe);
-    event RemovedReserve(bytes32 reserveKey);
-
-    // event: Price Oracle related
-    event UpdatedPriceOracleManagerAddr(address old, address _addr);
-    event NewPriceOracleProvider(
-        uint256 blockNum,
-        uint256 timestamp,
-        address indexed provider,
-        address paymentTokenAddress,
-        uint256 paymentAmtPerFeed,
-        uint256 blockCountPerFeed,
-        uint256 feedSize,
-        bytes32 whitelistedIPAddr
-    );
-    event ConfigPriceOracleProvider(
-        address indexed provider,
-        address paymentTokenAddress,
-        uint256 paymentAmtPerFeed,
-        uint256 blockCountPerFeed,
-        uint256 feedSize,
-        bytes32 whitelistedIPAddr
-    );
-    event RemovedPriceOracleProvider(address indexed _provider, uint256 blockNum, uint256 timestamp);
-    event PausedPriceOracleProvider(address indexed _provider);
-    event UnpausedPriceOracleProvider(address indexed _provider);
-
-    event PeggedTab(bytes3 _ptab, bytes3 _tab, uint256 _priceRatio);
-    event NewTab(bytes3 _tab, address tabAddr);
-    event CtrlAltDelTab(bytes3 indexed _tab, uint256 _btcTabRate);
+    address public configAddress;
+    address public tabRegistryAddress;
+    address public reserveRegistryAddress;
+    address public priceOracleManagerAddress;
 
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(address _governance, address _emergencyGovernance, address _deployer) public initializer {
+    function initialize(
+        address _governance, 
+        address _emergencyGovernance, 
+        address _deployer,
+        address _upgrader
+    ) 
+        public 
+        initializer 
+    {
         __AccessControlDefaultAdminRules_init(1 days, _governance);
         __UUPSUpgradeable_init();
         _grantRole(MAINTAINER_ROLE, _governance);
         _grantRole(MAINTAINER_ROLE, _emergencyGovernance);
         _grantRole(MAINTAINER_ROLE, _deployer);
-        emergencyGovernanceController = _emergencyGovernance;
-        defBlockGenerationTimeInSecond = 12;
+        
+        _grantRole(UPGRADER_ROLE, _upgrader);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) { }
+    function _authorizeUpgrade(address newImplementation) internal override virtual onlyRole(UPGRADER_ROLE) { }
 
     function setContractAddress(
         address _config,
@@ -125,37 +78,19 @@ contract GovernanceAction is Initializable, AccessControlDefaultAdminRulesUpgrad
     }
 
     function setDefBlockGenerationTimeInSecond(uint256 sec) external onlyRole(MAINTAINER_ROLE) {
-        require(sec > 0, "ZERO_VALUE");
         IPriceOracleManager(priceOracleManagerAddress).setDefBlockGenerationTimeInSecond(sec);
-        emit UpdatedDefBlockGenerationTimeInSecond(defBlockGenerationTimeInSecond, sec);
-        defBlockGenerationTimeInSecond = sec;
-    }
-
-    // Config
-
-    function updateReserveParams(
-        bytes32[] calldata _reserveKey,
-        uint256[] calldata _processFeeRate,
-        uint256[] calldata _minReserveRatio,
-        uint256[] calldata _liquidationRatio
-    )
-        external
-        onlyRole(MAINTAINER_ROLE)
-    {
-        emit UpdatedReserveParams(_reserveKey, _processFeeRate, _minReserveRatio, _liquidationRatio);
-        IConfig(configAddress).setReserveParams(_reserveKey, _processFeeRate, _minReserveRatio, _liquidationRatio);
+        emit UpdatedDefBlockGenerationTimeInSecond(sec);
     }
 
     function updateTabParams(
         bytes3[] calldata _tab,
-        uint256[] calldata _riskPenaltyPerFrame,
-        uint256[] calldata _processFeeRate
+        IConfig.TabParams[] calldata _tabParams
     )
         external
         onlyRole(MAINTAINER_ROLE)
     {
-        emit UpdatedTabParams(_tab, _riskPenaltyPerFrame, _processFeeRate);
-        IConfig(configAddress).setTabParams(_tab, _riskPenaltyPerFrame, _processFeeRate);
+        IConfig(configAddress).setTabParams(_tab, _tabParams);
+        emit UpdatedTabParams(_tab.length);
     }
 
     function updateAuctionParams(
@@ -167,24 +102,20 @@ contract GovernanceAction is Initializable, AccessControlDefaultAdminRulesUpgrad
         external
         onlyRole(MAINTAINER_ROLE)
     {
-        emit UpdatedAuctionParams(
+        IConfig(configAddress).setAuctionParams(
             _auctionStartPriceDiscount, _auctionStepPriceDiscount, _auctionStepDurationInSec, _auctionManager
         );
-        IConfig(configAddress).setAuctionParams(
+        emit UpdatedAuctionParams(
             _auctionStartPriceDiscount, _auctionStepPriceDiscount, _auctionStepDurationInSec, _auctionManager
         );
     }
 
-    // Tab
-
     /**
      *
+     * @dev When tab is paused, `VaultManager` operations such as create vault,
+     * withdraw tab, payback tab, and withdraw reserve will fail.
+     * And the frozen tab's vaults will not be charged risk penalty (if any).
      * @param _tab Tab code to be disabled(freezed)
-     * @dev When tab is paused, the following actions on paused tab will fail:
-     * - VaultManager.createVault
-     * - VaultManager.adjustTab
-     * - VaultManager.adjustReserve
-     * - Disabled risk penalty on vaults below minimum reserve ratio
      */
     function disableTab(bytes3 _tab) external onlyRole(MAINTAINER_ROLE) {
         ITabRegistry(tabRegistryAddress).disableTab(_tab);
@@ -214,44 +145,34 @@ contract GovernanceAction is Initializable, AccessControlDefaultAdminRulesUpgrad
     }
 
     function createNewTab(bytes3 _tab) external onlyRole(MAINTAINER_ROLE) returns (address) {
-        require(ITabRegistry(tabRegistryAddress).tabs(_tab) == address(0), "EXISTED_TAB");
-        require(ITabRegistry(tabRegistryAddress).peggedTabPriceRatio(_tab) == 0, "EXISTED_PEGGED_TAB");
-
         address tabAddr = ITabRegistry(tabRegistryAddress).createTab(_tab);
         emit NewTab(_tab, tabAddr);
-
         return tabAddr;
     }
 
-    // Reserve
-
     function addReserve(
-        bytes32 _reserveKey,
         address _token,
-        address _vaultManager
+        address _reserveSafe
     )
         external
         onlyRole(MAINTAINER_ROLE)
     {
-        ReserveSafe reserveSafe = new ReserveSafe(owner(), emergencyGovernanceController, _vaultManager, _token);
-        IReserveRegistry(reserveRegistryAddress).addReserve(_reserveKey, _token, address(reserveSafe));
-        emit AddedReserve(_reserveKey, _token, address(reserveSafe));
+        IReserveRegistry(reserveRegistryAddress).addReserve(_token, _reserveSafe);
+        emit AddedReserve(_token, _reserveSafe);
     }
 
-    function disableReserve(bytes32 _reserveKey) external onlyRole(MAINTAINER_ROLE) {
-        IReserveRegistry(reserveRegistryAddress).removeReserve(_reserveKey);
-        emit RemovedReserve(_reserveKey);
+    function disableReserve(address _token) external onlyRole(MAINTAINER_ROLE) {
+        IReserveRegistry(reserveRegistryAddress).removeReserve(_token);
+        emit RemovedReserve(_token);
     }
-
-    // Price Oracle
 
     /**
      *
      * @param provider Wallet address of the new provider.
      * @param paymentTokenAddress Payment token address.
      * @param paymentAmtPerFeed Unit price of each feed.
-     * @param blockCountPerFeed Assume 5-min feed interval, 60s / 12s * 5m = 25 blockCountPerFeed.
-     * Within blockCountPerFeed range, expect incoming feed
+     * @param blockCountPerFeed Assume 5-min feed interval and 2s block gen. time
+     * Each feed is expected to arrive within 60/2 * 5 = 150 blocks.
      * @param feedSize Minimum number of currency pairs sent by provider.
      * @param whitelistedIPAddr Comma separated IP Address(es). Max 2 IP when IP is full length (15*2). Price feeds are
      * expected to send from these IP.
@@ -267,16 +188,7 @@ contract GovernanceAction is Initializable, AccessControlDefaultAdminRulesUpgrad
         external
         onlyRole(MAINTAINER_ROLE)
     {
-        require(provider != address(0), "INVALID_PROVIDER");
-        require(providers[provider].activatedSinceBlockNum == 0, "EXISTED_PROVIDER");
-        require(paymentTokenAddress != address(0), "INVALID_PAYMENT_TOKEN_ADDR");
-        require(paymentAmtPerFeed > 0, "ZERO_PAYMENT_AMT");
-        require(blockCountPerFeed > 0, "ZERO_BLOCK_COUNT_PER_FEED");
-        require(feedSize > 0, "ZERO_FEED_SIZE");
-
-        providers[provider] = OracleProvider(block.number, block.timestamp, 0, 0);
-
-        emit NewPriceOracleProvider(
+        IPriceOracleManager(priceOracleManagerAddress).addProvider(
             block.number,
             block.timestamp,
             provider,
@@ -286,7 +198,7 @@ contract GovernanceAction is Initializable, AccessControlDefaultAdminRulesUpgrad
             feedSize,
             whitelistedIPAddr
         );
-        IPriceOracleManager(priceOracleManagerAddress).addProvider(
+        emit NewPriceOracleProvider(
             block.number,
             block.timestamp,
             provider,
@@ -309,13 +221,6 @@ contract GovernanceAction is Initializable, AccessControlDefaultAdminRulesUpgrad
         external
         onlyRole(MAINTAINER_ROLE)
     {
-        require(
-            providers[provider].activatedTimestamp > 0 && providers[provider].disabledOnBlockId == 0, "INVALID_PROVIDER"
-        );
-        require(paymentTokenAddress != address(0), "INVALID_PAYMENT_TOKEN_ADDR");
-        require(blockCountPerFeed > 0, "ZERO_BLOCK_COUNT_PER_FEED");
-        require(feedSize > 0, "ZERO_FEED_SIZE");
-
         IPriceOracleManager(priceOracleManagerAddress).configureProvider(
             provider, paymentTokenAddress, paymentAmtPerFeed, blockCountPerFeed, feedSize, whitelistedIPAddr
         );
@@ -332,14 +237,6 @@ contract GovernanceAction is Initializable, AccessControlDefaultAdminRulesUpgrad
         external
         onlyRole(MAINTAINER_ROLE)
     {
-        require(_provider != address(0), "INVALID_ADDR");
-        require(_blockNumber > 0, "ZERO_BLOCK_NUMBER");
-        require(_timestamp > 0, "ZERO_TIMESTAMP");
-        require(providers[_provider].activatedSinceBlockNum > 0, "NOT_FOUND");
-
-        providers[_provider].disabledOnBlockId = _blockNumber;
-        providers[_provider].disabledTimestamp = _timestamp;
-
         IPriceOracleManager(priceOracleManagerAddress).disableProvider(_provider, _blockNumber, _timestamp);
         emit RemovedPriceOracleProvider(_provider, _blockNumber, _timestamp);
     }
@@ -354,8 +251,13 @@ contract GovernanceAction is Initializable, AccessControlDefaultAdminRulesUpgrad
         emit UnpausedPriceOracleProvider(_provider);
     }
 
-    /// @dev ProtocolVault contract is expected to be deployed before calling this & granted MINTER_ROLE for the TAB
-    /// contract. Revoked same role from VaultManager.
+    /**
+     * @dev `ProtocolVault` contract must be deployed first. 
+     * Grant MINTER_ROLE on the targeted tab to the created `ProtocolVault`.
+     * Revoke MINTER_ROLE from `VaultManager`.
+     * @param _tab Tab to be depegged.
+     * @param _btcTabRate BTC to Tab rate
+     */
     function ctrlAltDel(bytes3 _tab, uint256 _btcTabRate) external onlyRole(MAINTAINER_ROLE) {
         ITabRegistry(tabRegistryAddress).ctrlAltDel(_tab, _btcTabRate);
         emit CtrlAltDelTab(_tab, _btcTabRate);
