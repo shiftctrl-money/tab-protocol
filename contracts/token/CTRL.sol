@@ -53,7 +53,7 @@ contract CTRL is
     }
 
     // solhint-disable-next-line func-name-mixedcase
-    function CLOCK_MODE() public pure override returns (string memory) {
+    function CLOCK_MODE() public view override returns (string memory) {
         return "mode=timestamp";
     }
 

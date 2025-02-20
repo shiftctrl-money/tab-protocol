@@ -144,7 +144,7 @@ contract PriceOracleManager is
     }
 
     function activeProviderCount() public view returns (uint256 x) {
-        for (uint256 i = 0; i < providerList.length; i++) {
+        for (uint256 i; i < providerList.length; i++) {
             OracleProvider memory prv = providers[providerList[i]];
             if (
                 prv.disabledOnBlockId == 0 && prv.disabledTimestamp == 0 && !prv.paused
@@ -320,7 +320,7 @@ contract PriceOracleManager is
 
     function unpauseProvider(address _provider) external onlyRole(MAINTAINER_ROLE) {
         if (
-            providers[_provider].paused == false ||
+            !providers[_provider].paused ||
             providers[_provider].activatedTimestamp == 0
         )
             revert InvalidProvider(_provider);
@@ -416,7 +416,7 @@ contract PriceOracleManager is
 
         uint256 amtToPay;
         uint256 timeSpanSinceLastUpdated;
-        for (uint256 i = 0; i < 10; i++) {
+        for (uint256 i; i < 10; i++) {
             if (_providerList[i] == address(0))
                 break;
 
