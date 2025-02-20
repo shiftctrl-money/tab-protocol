@@ -91,7 +91,7 @@ contract ReserveRegistry is IReserveRegistry, AccessControlDefaultAdminRules {
     function removeReserve(address _token) external onlyRole(MAINTAINER_ROLE) {
         if (reserveAddrSafe[_token] == address(0))
             revert InvalidReserveToken();
-        if (enabledReserve[_token] == false)
+        if (!enabledReserve[_token])
             revert InvalidReserveToken();
         enabledReserve[_token] = false;
         emit RemovedReserve(_token);

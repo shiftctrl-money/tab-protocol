@@ -213,7 +213,7 @@ contract AuctionManager is AccessControlDefaultAdminRules, ReentrancyGuard, IAuc
     )
         external 
         view 
-        returns(AuctionDetails memory ad) 
+        returns(AuctionDetails memory) 
     {
         return auctionDetails[auctionId];
     }

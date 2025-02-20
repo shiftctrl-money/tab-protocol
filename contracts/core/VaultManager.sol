@@ -532,10 +532,10 @@ contract VaultManager is
         CtrlAltDelData memory data = CtrlAltDelData(-1, 0, 0, 0, 0);
 
         // Iterate all vaults of the Tab type
-        for (uint256 i = 0; i < ownerList.length; i++) {
+        for (uint256 i; i < ownerList.length; i++) {
             uint256[] memory ownerVaultIds = vaultOwners[ownerList[i]];
 
-            for (uint256 n = 0; n < ownerVaultIds.length; n++) {
+            for (uint256 n; n < ownerVaultIds.length; n++) {
                 Vault storage v = vaults[ownerList[i]][ownerVaultIds[n]];
 
                 // Vault Tab = CtrlAltDel's Tab && Vault is not liquidated
@@ -653,7 +653,7 @@ contract VaultManager is
         pure 
         returns (int256) 
     {
-        for (uint256 j = 0; j < _addr.length; j++) {
+        for (uint256 j; j < _addr.length; j++) {
             if (_addr[j] == _toMatch) {
                 return int256(j);
             }

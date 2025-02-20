@@ -302,7 +302,7 @@ contract VaultKeeper is Initializable, AccessControlDefaultAdminRulesUpgradeable
                 }
                 checkedTimestamp = checkedTimestamp + (riskPenaltyFrameInSecond * _gap);
 
-                for (uint256 r = 0; r < vaultIdList.length; r++) {
+                for (uint256 r; r < vaultIdList.length; r++) {
                     vaultId = vaultIdList[r];
                     VaultCacheDetails memory vd = vaultMap[vaultId];
                     uint256 riskPenalty = calcRiskPenaltyAmt(
