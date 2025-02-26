@@ -36,26 +36,26 @@ Please refer to deployed smart contract addresses below:
 
 | Contract Name                             | Deployed Address (Base Sepolia)                                                                                        |
 |-------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|
-|TabProxyAdmin  							|[0x2c112a83E7859c7e513C94ee95B55707c87f6004](https://sepolia.basescan.org/address/0x2c112a83E7859c7e513C94ee95B55707c87f6004)|
-|CTRL										|[0x7F53Fb785Feee996117205e2b81e4D77755701Fe](https://sepolia.basescan.org/address/0x7F53Fb785Feee996117205e2b81e4D77755701Fe)|
-|GovernanceTimelockController				|[0x4e41d11Cb9540891a55B9744a59025E5382DDeCF](https://sepolia.basescan.org/address/0x4e41d11Cb9540891a55B9744a59025E5382DDeCF)|
-|GovernanceEmergencyTimelockController		|[0xE5A01AD9d0065e66553B3bF9C3E12F0b6aC20201](https://sepolia.basescan.org/address/0xE5A01AD9d0065e66553B3bF9C3E12F0b6aC20201)|
-|ShiftCtrlGovernor							|[0x6EdeC03274302038C3A3E8C3853E100f6A67D10f](https://sepolia.basescan.org/address/0x6EdeC03274302038C3A3E8C3853E100f6A67D10f)|
-|ShiftCtrlEmergencyGovernor					|[0x82d558fD3a71fB4E1256424E8be724Cb5Ca744A5](https://sepolia.basescan.org/address/0x82d558fD3a71fB4E1256424E8be724Cb5Ca744A5)|
-|cbBTC (simulated for testnet)				|[0xfDd7b819ca8422e2031abA3A46cE2Ee2386E3c13](https://sepolia.basescan.org/address/0xfDd7b819ca8422e2031abA3A46cE2Ee2386E3c13)|
-|GovernanceAction							|[0xfE8F568092ebBaE143af77952e2AE222d6E56896](https://sepolia.basescan.org/address/0xfE8F568092ebBaE143af77952e2AE222d6E56896)|
-|VaultManager								|[0x11276132F98756673d66DBfb424d0ae0510d9219](https://sepolia.basescan.org/address/0x11276132F98756673d66DBfb424d0ae0510d9219)|
-|VaultUtils                                 |[0x8786dA72C762e4A83286cD91b0CBC9a7C8E5531B](https://sepolia.basescan.org/address/0x8786dA72C762e4A83286cD91b0CBC9a7C8E5531B)|
-|TabRegistry								|[0x33B54050d72c8Ffeb6c0d7E0857c7C012643DeA0](https://sepolia.basescan.org/address/0x33B54050d72c8Ffeb6c0d7E0857c7C012643DeA0)|
-|TabFactory									|[0x9F440e98dD11a44AeDC8CA88bb7cA3756fdfFED1](https://sepolia.basescan.org/address/0x9F440e98dD11a44AeDC8CA88bb7cA3756fdfFED1)|
-|AuctionManager								|[0xA4C2b64Bd05BF29c297C06D5bd1DaC3E99F57558](https://sepolia.basescan.org/address/0xA4C2b64Bd05BF29c297C06D5bd1DaC3E99F57558)|
-|Config										|[0x61f2f994d35fDc75990Fe273e34913a3AcC928E6](https://sepolia.basescan.org/address/0x61f2f994d35fDc75990Fe273e34913a3AcC928E6)|
-|ReserveRegistry							|[0x5824F087B9AE3327e0Ee9cc9DB04E2Cc08ec1BA3](https://sepolia.basescan.org/address/0x5824F087B9AE3327e0Ee9cc9DB04E2Cc08ec1BA3)|
-|ReserveSafe    							|[0xF308055b4b8Ea0ccec1699cab524185967c28ea0](https://sepolia.basescan.org/address/0xF308055b4b8Ea0ccec1699cab524185967c28ea0)|
-|PriceOracleManager							|[0x192Ee2bAD42B9e4C903975fE5615888e39be7A6a](https://sepolia.basescan.org/address/0x192Ee2bAD42B9e4C903975fE5615888e39be7A6a)|
-|PriceOracle								|[0xa6188Fcd9f90F76c692D139099D9909B78fb632c](https://sepolia.basescan.org/address/0xa6188Fcd9f90F76c692D139099D9909B78fb632c)|
-|VaultKeeper								|[0xd9AF87C4D2Ff3f250f6B3a66C9313e37d912117b](https://sepolia.basescan.org/address/0xd9AF87C4D2Ff3f250f6B3a66C9313e37d912117b)|
-|ProtocolVault 								|[0xD5D2DA37819FCa1514570499B6eA59F98A57f2aF](https://sepolia.basescan.org/address/0xD5D2DA37819FCa1514570499B6eA59F98A57f2aF)|
+|TabProxyAdmin  							|[0xF44013D4BE0F452938B0b805Bc5Bf0D3Fbd4102c](https://sepolia.basescan.org/address/0xF44013D4BE0F452938B0b805Bc5Bf0D3Fbd4102c)|
+|CTRL										|[0x193410b8cdeD8F4D63E43D0f2AeD99bd862ed1Bc](https://sepolia.basescan.org/address/0x193410b8cdeD8F4D63E43D0f2AeD99bd862ed1Bc)|
+|GovernanceTimelockController				|[0x783bDAF73E8F40672421204d6FF3f448767d72c6](https://sepolia.basescan.org/address/0x783bDAF73E8F40672421204d6FF3f448767d72c6)|
+|GovernanceEmergencyTimelockController		|[0x997275213b66AEAAb4042dF9457F2913969368f2](https://sepolia.basescan.org/address/0x997275213b66AEAAb4042dF9457F2913969368f2)|
+|ShiftCtrlGovernor							|[0x89E7068cf18F22765D1F2902d1BaB8C839B8d013](https://sepolia.basescan.org/address/0x89E7068cf18F22765D1F2902d1BaB8C839B8d013)|
+|ShiftCtrlEmergencyGovernor					|[0xcb41b90E53C227241cdB018e87797afcE158d061](https://sepolia.basescan.org/address/0xcb41b90E53C227241cdB018e87797afcE158d061)|
+|cbBTC (simulated for testnet)				|[0x7eC62ECbE14B6E3A8B70942dFDf302B4dd9d6a51](https://sepolia.basescan.org/address/0x7eC62ECbE14B6E3A8B70942dFDf302B4dd9d6a51)|
+|GovernanceAction							|[0xE1a5CC4599DA4bd2D25F57442222647Fe1B69Dda](https://sepolia.basescan.org/address/0xE1a5CC4599DA4bd2D25F57442222647Fe1B69Dda)|
+|VaultManager								|[0xeAf6aB024D4a7192322090Fea1C402a5555cD107](https://sepolia.basescan.org/address/0xeAf6aB024D4a7192322090Fea1C402a5555cD107)|
+|VaultUtils                                 |[0x99843f8306AecdDC8EE6d47F1A144836D332a5B4](https://sepolia.basescan.org/address/0x99843f8306AecdDC8EE6d47F1A144836D332a5B4)|
+|TabRegistry								|[0x9b2F93f5be029Fbb4Cb51491951943f7368b2f1C](https://sepolia.basescan.org/address/0x9b2F93f5be029Fbb4Cb51491951943f7368b2f1C)|
+|TabFactory									|[0x83F19d560935F5299E7DE4296e7cb7adA0417525](https://sepolia.basescan.org/address/0x83F19d560935F5299E7DE4296e7cb7adA0417525)|
+|AuctionManager								|[0xB93cb66DFaa0cDA61D83BF9f39A076EA2fa2827B](https://sepolia.basescan.org/address/0xB93cb66DFaa0cDA61D83BF9f39A076EA2fa2827B)|
+|Config										|[0x25B9982A32106EeB2Aa052319011De58A7d33457](https://sepolia.basescan.org/address/0x25B9982A32106EeB2Aa052319011De58A7d33457)|
+|ReserveRegistry							|[0xDA8A64cDFaeb08b3f28b072b0d4aC371953F5B6E](https://sepolia.basescan.org/address/0xDA8A64cDFaeb08b3f28b072b0d4aC371953F5B6E)|
+|ReserveSafe    							|[0xE8a28176Bed3a53CBF2Bc65B597811909F1A1389](https://sepolia.basescan.org/address/0xE8a28176Bed3a53CBF2Bc65B597811909F1A1389)|
+|PriceOracleManager							|[0xBdFd9503f62A23092504eD072158092B6B3342ac](https://sepolia.basescan.org/address/0xBdFd9503f62A23092504eD072158092B6B3342ac)|
+|PriceOracle								|[0x7a65f5f7b2ba2F15468688c8e98835A3f9be2520](https://sepolia.basescan.org/address/0x7a65f5f7b2ba2F15468688c8e98835A3f9be2520)|
+|VaultKeeper								|[0x303818F385f1675BBB07dDE155987f6b7041753c](https://sepolia.basescan.org/address/0x303818F385f1675BBB07dDE155987f6b7041753c)|
+|ProtocolVault 								|[0xBC6bef5A3a1211B033322F3730e8DFf2f81AcA84](https://sepolia.basescan.org/address/0xBC6bef5A3a1211B033322F3730e8DFf2f81AcA84)|
 
 ## Contributing
 
