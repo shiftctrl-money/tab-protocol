@@ -69,7 +69,7 @@ contract DeployMain is Script {
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant DEPLOYER_ROLE = keccak256("DEPLOYER_ROLE");
 
-    address owner = 0xF9D253eB19B5c929fcF8B28a9B34Aaba61dB3F56; // deployer
+    address owner = 0x553A9FB9B5590EE27d8ddc589005afca99D51aa3; // deployer
 
     address cbBTCAddr; // TODO For mainnet, use 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf
     address faucetAddr = 0xe23492593e019AbC07255755B2ae813E3DD76F31;
@@ -351,10 +351,9 @@ contract DeployMain is Script {
         // Add 3 oracle providers for testnet
         // Assume 5-min feed interval and 2s block gen. time,
         // each feed is expected to arrive within 60/2 * 5 = 150 blocks.
-        // (TODO: Uncomment for local testnet fork test)
         governanceAction.addPriceOracleProvider(
             0x346Ed1282B89D8c948b404C3c3599f8D8ba2AA0e, // provider
-            0xC9D1EB6Ee4877D5De9b70B29dDd37A3Cf9A2175F, // paymentTokenAddress: CTRL address
+            address(ctrl), // paymentTokenAddress: CTRL address
             1e16,       // paymentAmtPerFeed: 0.01 CTRL for each feed
             150,        // blockCountPerFeed
             10,         // feedSize: minimum number of currency pairs sent by provider
@@ -362,7 +361,7 @@ contract DeployMain is Script {
         );
         governanceAction.addPriceOracleProvider(
             0xE728C3436836d980AeCd7DcB2935dc808c2E5a5f, // provider
-            0xC9D1EB6Ee4877D5De9b70B29dDd37A3Cf9A2175F, // paymentTokenAddress: CTRL address
+            address(ctrl), // paymentTokenAddress: CTRL address
             1e16,       // paymentAmtPerFeed: 0.01 CTRL for each feed
             150,        // blockCountPerFeed
             10,         // feedSize: minimum number of currency pairs sent by provider
@@ -370,7 +369,7 @@ contract DeployMain is Script {
         );
         governanceAction.addPriceOracleProvider(
             0x6EeA49a87c6e46c8EC6C74C9870717eFF8616C3B, // provider
-            0xC9D1EB6Ee4877D5De9b70B29dDd37A3Cf9A2175F, // paymentTokenAddress: CTRL address
+            address(ctrl), // paymentTokenAddress: CTRL address
             1e16,       // paymentAmtPerFeed: 0.01 CTRL for each feed
             150,        // blockCountPerFeed
             10,         // feedSize: minimum number of currency pairs sent by provider

@@ -72,7 +72,7 @@ contract PriceOracleManagerTest is Deployer {
         assertEq(priceOracleManager.hasRole(MAINTAINER_ROLE, address(governanceTimelockController)), true);
         assertEq(priceOracleManager.hasRole(MAINTAINER_ROLE, address(emergencyTimelockController)), true);
         assertEq(priceOracleManager.hasRole(MAINTAINER_ROLE, address(governanceAction)), true);
-        assertEq(priceOracleManager.hasRole(MAINTAINER_ROLE, signerAuthorizedAddr), true); // _authorizedCaller: tab-oracle 
+        assertEq(priceOracleManager.hasRole(MAINTAINER_ROLE, oracleProviderPerformanceSignerAddr), true); // _authorizedCaller: tab-oracle 
         
         assertEq(priceOracleManager.hasRole(CONFIG_ROLE, address(governanceTimelockController)), true);
         assertEq(priceOracleManager.hasRole(CONFIG_ROLE, address(emergencyTimelockController)), true);
@@ -123,9 +123,9 @@ contract PriceOracleManagerTest is Deployer {
         upgraded_v2.upgraded("test");
         vm.stopPrank();
 
-        assertEq(upgraded_v2.providerCount(), 3);
+        assertEq(upgraded_v2.providerCount(), 6);
         assertEq(upgraded_v2.activeProvider(eoa_accounts[7]), true);
-        assertEq(upgraded_v2.activeProviderCount(), 3);
+        assertEq(upgraded_v2.activeProviderCount(), 6);
     }
 
     function test_setPriceOracle() public {
@@ -190,7 +190,7 @@ contract PriceOracleManagerTest is Deployer {
     }
 
     function test_providerCount() public {
-        assertEq(priceOracleManager.providerCount(), 3);
+        assertEq(priceOracleManager.providerCount(), 6);
         vm.startPrank(address(governanceTimelockController));
         governanceAction.addPriceOracleProvider(
             eoa_accounts[6],
@@ -201,43 +201,43 @@ contract PriceOracleManagerTest is Deployer {
             bytes32(abi.encodePacked("123.123.123.123,192.168.100.100"))
         );
         vm.stopPrank();
-        assertEq(priceOracleManager.providerCount(), 4);
+        assertEq(priceOracleManager.providerCount(), 7);
     }
 
     function test_activeProvider_activeProviderCount() public {
         assertEq(priceOracleManager.activeProvider(eoa_accounts[7]), true);
         assertEq(priceOracleManager.activeProvider(eoa_accounts[8]), true);
         assertEq(priceOracleManager.activeProvider(eoa_accounts[9]), true);
-        assertEq(priceOracleManager.activeProviderCount(), 3);
+        assertEq(priceOracleManager.activeProviderCount(), 6);
         
         vm.startPrank(address(governanceTimelockController));
         priceOracleManager.pauseProvider(eoa_accounts[7]);
         assertEq(priceOracleManager.activeProvider(eoa_accounts[7]), false);
-        assertEq(priceOracleManager.activeProviderCount(), 2);
+        assertEq(priceOracleManager.activeProviderCount(), 5);
         
         priceOracleManager.disableProvider(eoa_accounts[8], block.number, block.timestamp);
         assertEq(priceOracleManager.activeProvider(eoa_accounts[8]), false);
-        assertEq(priceOracleManager.activeProviderCount(), 1);
+        assertEq(priceOracleManager.activeProviderCount(), 4);
 
         priceOracleManager.pauseProvider(eoa_accounts[9]);
         assertEq(priceOracleManager.activeProvider(eoa_accounts[9]), false);
-        assertEq(priceOracleManager.activeProviderCount(), 0);
+        assertEq(priceOracleManager.activeProviderCount(), 3);
         vm.stopPrank();
     }
 
     function test_priceOracleProvider() public {
         provider = priceOracleManager.getProvider(eoa_accounts[7]);
-        assertEq(provider.index, 0);
+        assertEq(provider.index, 3);
         // assertEq(provider.activatedSinceBlockNum, 1);
         // assertEq(provider.activatedTimestamp, 1);
 
         provider = priceOracleManager.getProvider(eoa_accounts[8]);
-        assertEq(provider.index, 1);
+        assertEq(provider.index, 4);
         // assertEq(provider.activatedSinceBlockNum, 1);
         // assertEq(provider.activatedTimestamp, 1);
 
         provider = priceOracleManager.getProvider(eoa_accounts[9]);
-        assertEq(provider.index, 2);
+        assertEq(provider.index, 5);
         // assertEq(provider.activatedSinceBlockNum, 1);
         // assertEq(provider.activatedTimestamp, 1);
 
@@ -327,7 +327,7 @@ contract PriceOracleManagerTest is Deployer {
         
         nextBlock(value + 1);
         assertEq(priceOracleManager.activeProvider(owner), true);
-        assertEq(priceOracleManager.activeProviderCount(), 4);
+        assertEq(priceOracleManager.activeProviderCount(), 7);
 
         vm.stopPrank();
     }
@@ -368,7 +368,7 @@ contract PriceOracleManagerTest is Deployer {
         governanceAction.configurePriceOracleProvider(eoa_accounts[7], address(this), value, value, value, ip);
 
         provider = priceOracleManager.getProvider(eoa_accounts[7]);
-        assertEq(provider.index, 0);
+        assertEq(provider.index, 3);
         // assertEq(provider.activatedSinceBlockNum, 1);
         // assertEq(provider.activatedTimestamp, 1);
 
@@ -453,8 +453,8 @@ contract PriceOracleManagerTest is Deployer {
         provider = priceOracleManager.getProvider(eoa_accounts[7]);
         // assertEq(provider.disabledOnBlockId, 1);
         // assertEq(provider.disabledTimestamp, 1);
-        assertEq(priceOracleManager.providerCount(), 3);
-        assertEq(priceOracleManager.activeProviderCount(), 2);
+        assertEq(priceOracleManager.providerCount(), 6);
+        assertEq(priceOracleManager.activeProviderCount(), 5);
         assertEq(priceOracleManager.activeProvider(eoa_accounts[7]), false);
 
         vm.expectRevert(abi.encodeWithSelector(IPriceOracleManager.InvalidProvider.selector, eoa_accounts[7]));
@@ -470,7 +470,7 @@ contract PriceOracleManagerTest is Deployer {
         // assume tab-oracle module submits provider performance on every 6 hours
         nextBlock(6 hours); 
         
-        vm.startPrank(signerAuthorizedAddr);
+        vm.startPrank(oracleProviderPerformanceSignerAddr);
 
         uint256 amtToPay = 72 * 1e18;
         vm.expectEmit();
@@ -501,7 +501,7 @@ contract PriceOracleManagerTest is Deployer {
         assertEq(tracker.feedMissCount, 0);
 
         nextBlock(10); // short period since last update, expect no payment
-        vm.startPrank(signerAuthorizedAddr);
+        vm.startPrank(oracleProviderPerformanceSignerAddr);
         priceOracleManager.submitProviderFeedCount(providerList, feedCount, block.timestamp);
         tracker = priceOracleManager.getProviderTracker(eoa_accounts[7]);
         assertEq(tracker.lastUpdatedTimestamp, block.timestamp);
@@ -529,7 +529,7 @@ contract PriceOracleManagerTest is Deployer {
 
         // submit feed performance for 3 providers
         nextBlock(6 hours); 
-        vm.startPrank(signerAuthorizedAddr);
+        vm.startPrank(oracleProviderPerformanceSignerAddr);
         priceOracleManager.submitProviderFeedCount(providerList, feedCount, block.timestamp);
 
         vm.startPrank(eoa_accounts[8]);
@@ -555,7 +555,7 @@ contract PriceOracleManagerTest is Deployer {
         vm.stopPrank();
 
         nextBlock(6 hours);
-        vm.startPrank(signerAuthorizedAddr);
+        vm.startPrank(oracleProviderPerformanceSignerAddr);
         priceOracleManager.submitProviderFeedCount(providerList, feedCount, block.timestamp);
 
         vm.startPrank(deployer);

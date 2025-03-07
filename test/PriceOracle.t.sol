@@ -26,7 +26,7 @@ contract PriceOracleTest is Deployer {
         assertEq(priceOracle.hasRole(FEEDER_ROLE, address(governanceTimelockController)), true);
         assertEq(priceOracle.hasRole(FEEDER_ROLE, address(emergencyTimelockController)), true);
         assertEq(priceOracle.hasRole(FEEDER_ROLE, address(vaultManager)), true);
-        assertEq(priceOracle.hasRole(SIGNER_ROLE, signerAuthorizedAddr), true);
+        assertEq(priceOracle.hasRole(SIGNER_ROLE, oracleRelayerSignerAddr), true);
         assertEq(priceOracle.hasRole(PAUSER_ROLE, address(governanceTimelockController)), true);
         assertEq(priceOracle.hasRole(PAUSER_ROLE, address(emergencyTimelockController)), true);
         assertEq(priceOracle.hasRole(PRICE_ORACLE_MANAGER_ROLE, address(governanceTimelockController)), true);

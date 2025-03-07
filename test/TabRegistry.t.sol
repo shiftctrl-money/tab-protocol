@@ -32,7 +32,7 @@ contract TabRegistryTest is Deployer {
         assertEq(tabRegistry.hasRole(TAB_PAUSER_ROLE, address(governanceTimelockController)), true);
         assertEq(tabRegistry.hasRole(TAB_PAUSER_ROLE, address(emergencyTimelockController)), true);
         assertEq(tabRegistry.hasRole(TAB_PAUSER_ROLE, address(governanceAction)), true);
-        assertEq(tabRegistry.hasRole(TAB_PAUSER_ROLE, signerAuthorizedAddr), true);
+        assertEq(tabRegistry.hasRole(TAB_PAUSER_ROLE, tabRegistryFreezerAddr), true);
 
         assertEq(tabRegistry.hasRole(ALL_TAB_PAUSER_ROLE, address(governanceTimelockController)), true);
         assertEq(tabRegistry.hasRole(ALL_TAB_PAUSER_ROLE, address(emergencyTimelockController)), true);
@@ -178,7 +178,7 @@ contract TabRegistryTest is Deployer {
 
         assertEq(tabRegistry.frozenTabs(usd32), false);
 
-        vm.startPrank(signerAuthorizedAddr);
+        vm.startPrank(tabRegistryFreezerAddr);
         vm.expectEmit();
         emit ITabRegistry.FreezeTab(usd);        
         tabRegistry.disableTab(usd);

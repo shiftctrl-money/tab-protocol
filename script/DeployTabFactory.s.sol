@@ -24,6 +24,11 @@ contract DeployTabFactory is Script {
         TabERC20 deployed at: 0xE914B685a2912C2F5016EF5b29C7cD7Ec7904815
         TabFactory deployed at: 0x83F19d560935F5299E7DE4296e7cb7adA0417525
         TabFactory implementation: 0xE914B685a2912C2F5016EF5b29C7cD7Ec7904815
+
+       Mainnet:
+        TabERC20 deployed at: 0xf0ab89867c3053f91ebeD2b0dBe44B47BE2A0C13
+        TabFactory deployed at: 0x83F19d560935F5299E7DE4296e7cb7adA0417525
+        TabFactory implementation: 0xf0ab89867c3053f91ebeD2b0dBe44B47BE2A0C13
      */
     function run() external {
         vm.startBroadcast(deployer);
@@ -40,6 +45,9 @@ contract DeployTabFactory is Script {
         ));
         console.log("TabFactory deployed at:", address(tabFactory));
         console.log("TabFactory implementation:", tabFactory.implementation());
+
+        // mainnet
+        tabFactory.transferOwnership(0x553A9FB9B5590EE27d8ddc589005afca99D51aa3);
 
         vm.stopBroadcast();
     }

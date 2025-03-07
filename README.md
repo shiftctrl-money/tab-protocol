@@ -23,16 +23,42 @@ git submodule update
 forge test -vvv
 ```
 
-## Current Development Stage
-The project is currently being tested in [Base Sepolia testnet](https://sepolia.basescan.org).
+## Deployments
+The project is deployed to [BASE mainnet](https://www.base.org) (currently in Alpha phase). Please visit [Qwerty](https://qwerty.shiftctrl.money) to open the application.
+The protocol accepts [$cbBTC](https://basescan.org/address/0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf) as reserve token.
+For governance, refer [$CTRL](https://basescan.org/address/0x505568c65fF95E5e97Ca97B476BEb0db64F91499) token.
 
-You may visit [Qwerty](https://qwerty.shiftctrl.money) to join testing.
+## Mainnet Smart Contracts:
 
-CBBTC token is used as protocol reserve, visit [Faucet](https://qwerty.shiftctrl.money/faucet) to request test token.
+| Contract Name                               | Deployed Address (Base Mainnet)                                                                                     |
+|---------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
+|TabProxyAdmin  							  |[0x65FB1EF0f9C15b2653421D9008fd7E55889890E2](https://basescan.org/address/0x65FB1EF0f9C15b2653421D9008fd7E55889890E2)|
+|CTRL								  	   	  |[0x505568c65fF95E5e97Ca97B476BEb0db64F91499](https://basescan.org/address/0x505568c65fF95E5e97Ca97B476BEb0db64F91499)|
+|GovernanceTimelockController		    	  |[0x75977C03b7AFc9B0E645A6402B2b46E438F146D5](https://basescan.org/address/0x75977C03b7AFc9B0E645A6402B2b46E438F146D5)|
+|GovernanceEmergencyTimelockController		  |[0x4bedAa52B64A4b8aff01a5354516c2897ecEf58B](https://basescan.org/address/0x4bedAa52B64A4b8aff01a5354516c2897ecEf58B)|
+|ShiftCtrlGovernor							  |[0x747E429c1ceb8b0FB576650BEd6623785eAb0348](https://basescan.org/address/0x747E429c1ceb8b0FB576650BEd6623785eAb0348)|
+|ShiftCtrlEmergencyGovernor					  |[0x95205Ed4F55a012DCfd1497aEecc3C3A66496b22](https://basescan.org/address/0x95205Ed4F55a012DCfd1497aEecc3C3A66496b22)|
+|[cbBTC](https://www.coinbase.com/en-gb/cbbtc)|[0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf](https://basescan.org/address/0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf)|
+|GovernanceAction							  |[0xEBf09013763412Eb1108257fde050545F780D09c](https://basescan.org/address/0xEBf09013763412Eb1108257fde050545F780D09c)|
+|VaultManager								  |[0x11138452B689fd55d5Ad3991A6166dbBb6C2A774](https://basescan.org/address/0x11138452B689fd55d5Ad3991A6166dbBb6C2A774)|
+|VaultUtils                                   |[0x4034a758F7CFB316f5923B7a2568D8ff21ea998a](https://basescan.org/address/0x4034a758F7CFB316f5923B7a2568D8ff21ea998a)|
+|TabRegistry								  |[0x01D988944c3Bb067f56e600619345C3dB161f444](https://basescan.org/address/0x01D988944c3Bb067f56e600619345C3dB161f444)|
+|TabFactory									  |[0x83F19d560935F5299E7DE4296e7cb7adA0417525](https://basescan.org/address/0x83F19d560935F5299E7DE4296e7cb7adA0417525)|
+|AuctionManager								  |[0x731D9aD52663c2767A48303D09a668F9cE3aecc4](https://basescan.org/address/0x731D9aD52663c2767A48303D09a668F9cE3aecc4)|
+|Config										  |[0xC81455d98AD16db5043c775bD1eCd2677E39e670](https://basescan.org/address/0xC81455d98AD16db5043c775bD1eCd2677E39e670)|
+|ReserveRegistry							  |[0xb59B6ba5426255B669C3966261aC4b2D59A76943](https://basescan.org/address/0xb59B6ba5426255B669C3966261aC4b2D59A76943)|
+|ReserveSafe    							  |[0x6cdEB78a62bD94f2c08D6AbB0f1412B0F959a9A0](https://basescan.org/address/0x6cdEB78a62bD94f2c08D6AbB0f1412B0F959a9A0)|
+|PriceOracleManager							  |[0x5f6c5A786a1Aa89d3B18606f93Dc6bfA011a2fBC](https://basescan.org/address/0x5f6c5A786a1Aa89d3B18606f93Dc6bfA011a2fBC)|
+|PriceOracle								  |[0x8c3Fd83a9dFEC3D5e389aea60cA980A2e72A9A5A](https://basescan.org/address/0x8c3Fd83a9dFEC3D5e389aea60cA980A2e72A9A5A)|
+|VaultKeeper								  |[0xBbFD14d040b7E3b3cC3eef52DCB1E84Cb3E397C5](https://basescan.org/address/0xBbFD14d040b7E3b3cC3eef52DCB1E84Cb3E397C5)|
+|ProtocolVault 								  |N/A                                                                                                                  |
 
-Check on [Tab Contract Address](https://github.com/shiftctrl-money/tab-protocol/blob/92d3eb29e8b9c2d8a0d275c63efb56f4ff0c3de8/contracts/token/Tabs.md) to add minted Tabs into your wallet.
+## Testnet
 
-Please refer to deployed smart contract addresses below:
+Please visit [Test Application](https://test.shiftctrl.money) deployed to [Base Sepolia Testnet](https://sepolia.basescan.org).
+Use [Faucet](https://test.shiftctrl.money/faucet) to get test tokens ($cbBTC and $CTRL).
+
+## Testnet Smart Contracts:
 
 | Contract Name                             | Deployed Address (Base Sepolia)                                                                                        |
 |-------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|

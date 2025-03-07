@@ -291,7 +291,7 @@ contract GovernanceActionTest is Deployer {
             bytes32("")
         );
         governanceAction.addPriceOracleProvider(eoa_accounts[7], address(ctrl), 1e18, 100, 100, bytes32(""));
-        assertEq(priceOracleManager.providerCount(), 1);
+        assertEq(priceOracleManager.providerCount(), 4);
         assertEq(priceOracleManager.activeProvider(eoa_accounts[7]), true);
         info = priceOracleManager.getProviderInfo(eoa_accounts[7]);
         assertEq(info.paymentTokenAddress, address(ctrl));
@@ -310,7 +310,7 @@ contract GovernanceActionTest is Deployer {
             bytes32("192.168.1.1")
         );
         governanceAction.configurePriceOracleProvider(eoa_accounts[7], owner, 8e18, 99, 98, bytes32("192.168.1.1"));
-        assertEq(priceOracleManager.providerCount(), 1);
+        assertEq(priceOracleManager.providerCount(), 4);
         assertEq(priceOracleManager.activeProvider(eoa_accounts[7]), true);
         info = priceOracleManager.getProviderInfo(eoa_accounts[7]);
         assertEq(info.paymentTokenAddress, owner);
@@ -325,8 +325,8 @@ contract GovernanceActionTest is Deployer {
         provider = priceOracleManager.getProvider(eoa_accounts[7]);
         assertEq(provider.disabledOnBlockId, block.number);
         assertEq(provider.disabledTimestamp, block.timestamp);
-        assertEq(priceOracleManager.providerCount(), 1);
-        assertEq(priceOracleManager.activeProviderCount(), 0);
+        assertEq(priceOracleManager.providerCount(), 4);
+        assertEq(priceOracleManager.activeProviderCount(), 3);
         assertEq(priceOracleManager.activeProvider(eoa_accounts[7]), false);
 
         vm.stopPrank();
