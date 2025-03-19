@@ -28,52 +28,36 @@ import {VaultKeeper} from "../contracts/core/VaultKeeper.sol";
 import {VaultManager} from "../contracts/core/VaultManager.sol";
 import {VaultUtils} from "../contracts/utils/VaultUtils.sol";
 
-/// @dev Refer https://github.com/mds1/multicall/blob/main/src/interfaces/IMulticall3.sol
-// interface IMulticall3 {
-//     struct Call3 {
-//         address target;
-//         bool allowFailure;
-//         bytes callData;
-//     }
-
-//     struct Result {
-//         bool success;
-//         bytes returnData;
-//     }
-    
-//     function aggregate3(Call3[] calldata calls) external payable returns (Result[] memory returnData);
-// }
-
 /**
  * @dev Execute to deploy full Tab Protocol on testnet or mainnet.
  * Sample logs:
  * Deploying protocol contracts...
-    tabProxyAdmin:  0x2c112a83E7859c7e513C94ee95B55707c87f6004
-    CBBTC deployed at: 0xfDd7b819ca8422e2031abA3A46cE2Ee2386E3c13
-    CTRL implementation:  0x8D756b55986Ea70B78E31afbD9139F3e8F9Cef7f
-    CTRL:  0x7F53Fb785Feee996117205e2b81e4D77755701Fe
-    governanceTimelockController:  0x4e41d11Cb9540891a55B9744a59025E5382DDeCF
-    emergencyTimelockController:  0xE5A01AD9d0065e66553B3bF9C3E12F0b6aC20201
-    shiftCtrlGovernor:  0x6EdeC03274302038C3A3E8C3853E100f6A67D10f
-    shiftCtrlEmergencyGovernor:  0x82d558fD3a71fB4E1256424E8be724Cb5Ca744A5
-    governanceActionImpl:  0xeFC0d67F4897035Dcbf68eE24cb6CD35e79Bc331
-    governanceAction:  0xfE8F568092ebBaE143af77952e2AE222d6E56896
-    vaultManagerImpl:  0x2A73B84Af2DB25F628CB5959d8e40E27a905eBeB
-    vaultManager:  0x11276132F98756673d66DBfb424d0ae0510d9219
-    tabRegistry:  0x33B54050d72c8Ffeb6c0d7E0857c7C012643DeA0
-    tabFactory:  0x9F440e98dD11a44AeDC8CA88bb7cA3756fdfFED1
-    reserveRegistry:  0x5824F087B9AE3327e0Ee9cc9DB04E2Cc08ec1BA3
-    reserveSafe:  0xF308055b4b8Ea0ccec1699cab524185967c28ea0
-    auctionManager:  0xA4C2b64Bd05BF29c297C06D5bd1DaC3E99F57558
-    config:  0x61f2f994d35fDc75990Fe273e34913a3AcC928E6
-    vaultUtils:  0x8786dA72C762e4A83286cD91b0CBC9a7C8E5531B
-    priceOracleManagerImpl:  0x8d5aC91A6464769C5817254bE2478Ff5490E072F
-    priceOracleManager:  0x192Ee2bAD42B9e4C903975fE5615888e39be7A6a
-    priceOracle:  0xa6188Fcd9f90F76c692D139099D9909B78fb632c
-    vaultKeeperImpl:  0xbb606E52525785ab444ddbd459301C5C62F09316
-    vaultKeeper:  0xd9AF87C4D2Ff3f250f6B3a66C9313e37d912117b
-    protocolVaultImpl:  0x29F7D66da1051d5feE3bf395539EDdA9E3D4b731
-    protocolVault:  0xD5D2DA37819FCa1514570499B6eA59F98A57f2aF
+    tabProxyAdmin:  0xF44013D4BE0F452938B0b805Bc5Bf0D3Fbd4102c
+    CBBTC deployed at: 0x7eC62ECbE14B6E3A8B70942dFDf302B4dd9d6a51
+    CTRL implementation:  0x32CDaE2Eb710D7722Bcf7aFE1c33Cb3091C6fee8
+    CTRL:  0x193410b8cdeD8F4D63E43D0f2AeD99bd862ed1Bc
+    governanceTimelockController:  0x783bDAF73E8F40672421204d6FF3f448767d72c6
+    emergencyTimelockController:  0x997275213b66AEAAb4042dF9457F2913969368f2
+    shiftCtrlGovernor:  0x89E7068cf18F22765D1F2902d1BaB8C839B8d013
+    shiftCtrlEmergencyGovernor:  0xcb41b90E53C227241cdB018e87797afcE158d061
+    governanceActionImpl:  0xe4Cd0192D1e2976e80BF5F943B3f12E802c8dB6a
+    governanceAction:  0xE1a5CC4599DA4bd2D25F57442222647Fe1B69Dda
+    vaultManagerImpl:  0x65EdEf576C0c7A928E7CD2331de60111b5c0011B
+    vaultManager:  0xeAf6aB024D4a7192322090Fea1C402a5555cD107
+    tabRegistry:  0x9b2F93f5be029Fbb4Cb51491951943f7368b2f1C
+    tabFactory:  0x83F19d560935F5299E7DE4296e7cb7adA0417525
+    reserveRegistry:  0xDA8A64cDFaeb08b3f28b072b0d4aC371953F5B6E
+    reserveSafe:  0xE8a28176Bed3a53CBF2Bc65B597811909F1A1389
+    auctionManager:  0xB93cb66DFaa0cDA61D83BF9f39A076EA2fa2827B
+    config:  0x25B9982A32106EeB2Aa052319011De58A7d33457
+    vaultUtils:  0x99843f8306AecdDC8EE6d47F1A144836D332a5B4
+    priceOracleManagerImpl:  0xA850B25e6489e8259CAFFD9571d6dE6fE842C8cf
+    priceOracleManager:  0xBdFd9503f62A23092504eD072158092B6B3342ac
+    priceOracle:  0x7a65f5f7b2ba2F15468688c8e98835A3f9be2520
+    vaultKeeperImpl:  0x7a50Da5330b6fc3838Ef6EA757458a7601231aA8
+    vaultKeeper:  0x303818F385f1675BBB07dDE155987f6b7041753c
+    protocolVaultImpl:  0xE332Fc0D65a0aDAd9eD7cf5964D5223cF0a25bC3
+    protocolVault:  0xBC6bef5A3a1211B033322F3730e8DFf2f81AcA84
    Tab Protocol deployment is completed.
  */
 contract DeployMain is Script {
@@ -85,12 +69,11 @@ contract DeployMain is Script {
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     bytes32 public constant DEPLOYER_ROLE = keccak256("DEPLOYER_ROLE");
 
-    address owner = 0xF9D253eB19B5c929fcF8B28a9B34Aaba61dB3F56; // deployer
+    address owner = 0x553A9FB9B5590EE27d8ddc589005afca99D51aa3; // deployer
 
-    address multicall3Addr = 0xcA11bde05977b3631167028862bE2a173976CA11;
     address cbBTCAddr; // TODO For mainnet, use 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf
     address faucetAddr = 0xe23492593e019AbC07255755B2ae813E3DD76F31;
-    address tabFactoryAddr = 0x9F440e98dD11a44AeDC8CA88bb7cA3756fdfFED1;
+    address tabFactoryAddr = 0x83F19d560935F5299E7DE4296e7cb7adA0417525;
     address treasuryAddr = 0x7045CC042c0571F671236db73ba93BD1B82b2326;
     // TODO to run forked testnet, adjust `Signer.sol` to match configured oracle signer.
     address oracleRelayerSignerAddr = 0x6cC15689B28227d97481Fac73614cD8D35ede6D2; 
@@ -368,10 +351,9 @@ contract DeployMain is Script {
         // Add 3 oracle providers for testnet
         // Assume 5-min feed interval and 2s block gen. time,
         // each feed is expected to arrive within 60/2 * 5 = 150 blocks.
-        // (TODO: Uncomment for local testnet fork test)
         governanceAction.addPriceOracleProvider(
             0x346Ed1282B89D8c948b404C3c3599f8D8ba2AA0e, // provider
-            0xC9D1EB6Ee4877D5De9b70B29dDd37A3Cf9A2175F, // paymentTokenAddress: CTRL address
+            address(ctrl), // paymentTokenAddress: CTRL address
             1e16,       // paymentAmtPerFeed: 0.01 CTRL for each feed
             150,        // blockCountPerFeed
             10,         // feedSize: minimum number of currency pairs sent by provider
@@ -379,7 +361,7 @@ contract DeployMain is Script {
         );
         governanceAction.addPriceOracleProvider(
             0xE728C3436836d980AeCd7DcB2935dc808c2E5a5f, // provider
-            0xC9D1EB6Ee4877D5De9b70B29dDd37A3Cf9A2175F, // paymentTokenAddress: CTRL address
+            address(ctrl), // paymentTokenAddress: CTRL address
             1e16,       // paymentAmtPerFeed: 0.01 CTRL for each feed
             150,        // blockCountPerFeed
             10,         // feedSize: minimum number of currency pairs sent by provider
@@ -387,7 +369,7 @@ contract DeployMain is Script {
         );
         governanceAction.addPriceOracleProvider(
             0x6EeA49a87c6e46c8EC6C74C9870717eFF8616C3B, // provider
-            0xC9D1EB6Ee4877D5De9b70B29dDd37A3Cf9A2175F, // paymentTokenAddress: CTRL address
+            address(ctrl), // paymentTokenAddress: CTRL address
             1e16,       // paymentAmtPerFeed: 0.01 CTRL for each feed
             150,        // blockCountPerFeed
             10,         // feedSize: minimum number of currency pairs sent by provider

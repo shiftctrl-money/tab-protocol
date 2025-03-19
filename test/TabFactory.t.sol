@@ -71,8 +71,10 @@ contract TabFactoryTest is Deployer {
         assertEq(sUSD.balanceOf(owner), 1e18);
         vm.stopPrank();
         
+        vm.startPrank(owner);
         sUSD.burn(1e18);
         assertEq(sUSD.balanceOf(owner), 0);
+        vm.stopPrank();
     }
 
     function test_upgradeTabERC20() public {
