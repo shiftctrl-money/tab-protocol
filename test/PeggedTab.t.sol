@@ -8,6 +8,7 @@ import {TabERC20} from "../contracts/token/TabERC20.sol";
 import {IAuctionManager} from "../contracts/interfaces/IAuctionManager.sol";
 
 contract PeggedTab is Deployer {
+    bytes32 private pricePairKeyPEG = keccak256(abi.encodePacked(strReserve, "/s", bytes3(abi.encodePacked("PEG"))));
 
     function setUp() public {
         deploy();
@@ -22,7 +23,7 @@ contract PeggedTab is Deployer {
         vm.startPrank(deployer);
         cbBTC.approve(address(vaultManager), 2e8);
         priceData = signer.getUpdatePriceSignature(sUSD, 60000e18, block.timestamp); 
-        vaultManager.createVault(address(cbBTC), 1e18, 10000e18, priceData);
+        vaultManager.createVault(1e18, 10000e18, priceData);
         
         assertEq(priceOracle.peggedTabCount(), 0);
         bytes3 sPEG = bytes3(abi.encodePacked("PEG"));
@@ -33,13 +34,13 @@ contract PeggedTab is Deployer {
 
         vm.startPrank(deployer);
         priceData = signer.getUpdatePriceSignature(sPEG, 60000e18, block.timestamp);
-        vaultManager.createVault(address(cbBTC), 1e18, 10000e18, priceData);
-        assertEq(priceOracle.getPrice(sUSD), 120000e18);
-        assertEq(priceOracle.getPrice(sPEG), 60000e18);
+        vaultManager.createVault(1e18, 10000e18, priceData);
+        assertEq(priceOracle.getPrice(pricePairKeyUSD), 120000e18);
+        assertEq(priceOracle.getPrice(pricePairKeyPEG), 60000e18);
         assertEq(TabERC20(tabRegistry.getTabAddress(sUSD)).balanceOf(deployer), 10000e18);
         assertEq(TabERC20(tabRegistry.getTabAddress(sPEG)).balanceOf(deployer), 10000e18);
-        assertEq(priceOracle.getPrice(sPEG), 60000e18);
-        assertEq(priceOracle.getPrice(sUSD), 120000e18);
+        assertEq(priceOracle.getPrice(pricePairKeyPEG), 60000e18);
+        assertEq(priceOracle.getPrice(pricePairKeyUSD), 120000e18);
 
         priceData = signer.getUpdatePriceSignature(sPEG, 60000e18, block.timestamp);
         vaultManager.withdrawReserve(1, 1e17, priceData);
@@ -66,13 +67,13 @@ contract PeggedTab is Deployer {
         ad = auctionManager.getAuctionDetails(2);
         assertEq(ad.tab, tabRegistry.getTabAddress(sPEG));
 
-        uint256 price = priceOracle.getPrice(sUSD);
-        uint256 oldPrice = priceOracle.getOldPrice(sUSD);
+        uint256 price = priceOracle.getPrice(pricePairKeyUSD);
+        uint256 oldPrice = priceOracle.getOldPrice(pricePairKeyUSD);
         assertEq(price, oldPrice);
         assertEq(price, 120000e18);
 
-        price = priceOracle.getPrice(sPEG);
-        oldPrice = priceOracle.getOldPrice(sPEG);
+        price = priceOracle.getPrice(pricePairKeyPEG);
+        oldPrice = priceOracle.getOldPrice(pricePairKeyPEG);
         assertEq(price, oldPrice);
         assertEq(price, 60000e18);
 

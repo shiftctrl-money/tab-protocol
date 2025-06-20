@@ -22,7 +22,6 @@ import {ReserveSafe} from "../contracts/reserve/ReserveSafe.sol";
 import {ReserveRegistry} from "../contracts/reserve/ReserveRegistry.sol";
 import {AuctionManager} from "../contracts/core/AuctionManager.sol";
 import {Config} from "../contracts/core/Config.sol";
-import {ProtocolVault} from "../contracts/core/ProtocolVault.sol";
 import {TabRegistry} from "../contracts/core/TabRegistry.sol";
 import {VaultKeeper} from "../contracts/core/VaultKeeper.sol";
 import {VaultManager} from "../contracts/core/VaultManager.sol";
@@ -102,7 +101,6 @@ contract DeployMain is Script {
     VaultKeeper vaultKeeper;
     AuctionManager auctionManager;
     VaultUtils vaultUtils;
-    ProtocolVault protocolVault;
 
     function run() external {
         vm.startBroadcast(owner);
@@ -322,32 +320,6 @@ contract DeployMain is Script {
 
         config.setVaultKeeperAddress(vaultKeeperAddr);
 
-        // ProtocolVault
-        if (block.chainid == 84532) { // Deploy if it is running for testnet
-            bytes memory protocolVaultInitData = abi.encodeWithSignature(
-                "initialize(address,address,address,address)",
-                governance,                 // Governance controller
-                address(tabProxyAdmin),     // upgrader
-                vaultManagerAddr,           // Vault manager
-                address(reserveSafe)
-            );
-            ProtocolVault protocolVaultImpl = new ProtocolVault(); // implementation
-            console.log("protocolVaultImpl: ", address(protocolVaultImpl));
-            address protocolVaultAddr = address(
-                new TransparentUpgradeableProxy(
-                    address(protocolVaultImpl), address(tabProxyAdmin), protocolVaultInitData
-                )
-            );
-            protocolVault = ProtocolVault(protocolVaultAddr);
-            // Todo (before executing ctrlAltDel operation): 
-            // Revoke MINTER_ROLE from VaultManager on targeted tab.
-            // Grant MINTER_ROLE to ProtocolVault on targeted tab.
-
-            tabRegistry.setProtocolVaultAddress(protocolVaultAddr);
-
-            console.log("protocolVault: ", address(protocolVault));
-        }
-
         // Add 3 oracle providers for testnet
         // Assume 5-min feed interval and 2s block gen. time,
         // each feed is expected to arrive within 60/2 * 5 = 150 blocks.
@@ -376,6 +348,14 @@ contract DeployMain is Script {
             bytes32(0)  // whitelistedIPAddr: allow sending from any IP
         );
 
+        _prep();
+
+        console.log("Tab Protocol deployment is completed.");
+
+        vm.stopBroadcast();
+    }
+
+    function _prep() internal {
         // Testnet only: mint to faucet address
         cbBTC.mint(faucetAddr, 1e18);           // 10,000,000,000 cbBTC
         cbBTC.mint(owner, 1e18);                // 10,000,000,000 cbBTC
@@ -386,7 +366,7 @@ contract DeployMain is Script {
         // remove permissions
         // (TODO: Uncomment for mainnet or local testnet fork test)
         /*
-        tabFactory.transferOwnership(governance);
+        tabFactory.transferOwnership(address(governanceTimelockController));
         vaultManager.renounceRole(DEPLOYER_ROLE, owner);
         governanceAction.renounceRole(MAINTAINER_ROLE, owner);
         tabRegistry.renounceRole(MAINTAINER_ROLE, owner);
@@ -395,15 +375,11 @@ contract DeployMain is Script {
         priceOracleManager.renounceRole(MAINTAINER_ROLE, owner);
         */
 
-        ctrl.grantRole(UPGRADER_ROLE, governance);
-        ctrl.grantRole(UPGRADER_ROLE, emergencyGov);
+        ctrl.grantRole(UPGRADER_ROLE, address(governanceTimelockController));
+        ctrl.grantRole(UPGRADER_ROLE, address(emergencyTimelockController));
         // (TODO: Uncomment for mainnet or local testnet fork test)
-        // ctrl.beginDefaultAdminTransfer(governance);
+        // ctrl.beginDefaultAdminTransfer(address(governanceTimelockController));
         // After 1 day grace period, call: governanceController.acceptDefaultAdminTransfer()
-
-        console.log("Tab Protocol deployment is completed.");
-
-        vm.stopBroadcast();
     }
 
 }

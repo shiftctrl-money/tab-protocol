@@ -49,7 +49,7 @@ For governance, refer [$CTRL](https://basescan.org/address/0x505568c65fF95E5e97C
 |ReserveRegistry							  |[0xb59B6ba5426255B669C3966261aC4b2D59A76943](https://basescan.org/address/0xb59B6ba5426255B669C3966261aC4b2D59A76943)|
 |ReserveSafe    							  |[0x6cdEB78a62bD94f2c08D6AbB0f1412B0F959a9A0](https://basescan.org/address/0x6cdEB78a62bD94f2c08D6AbB0f1412B0F959a9A0)|
 |PriceOracleManager							  |[0x5f6c5A786a1Aa89d3B18606f93Dc6bfA011a2fBC](https://basescan.org/address/0x5f6c5A786a1Aa89d3B18606f93Dc6bfA011a2fBC)|
-|PriceOracle								  |[0x8c3Fd83a9dFEC3D5e389aea60cA980A2e72A9A5A](https://basescan.org/address/0x8c3Fd83a9dFEC3D5e389aea60cA980A2e72A9A5A)|
+|PriceOracle								  |[0x0eB8De03B9398Ac043218BAFd6Fce15950fAA8Cf](https://basescan.org/address/0x0eB8De03B9398Ac043218BAFd6Fce15950fAA8Cf)|
 |VaultKeeper								  |[0xBbFD14d040b7E3b3cC3eef52DCB1E84Cb3E397C5](https://basescan.org/address/0xBbFD14d040b7E3b3cC3eef52DCB1E84Cb3E397C5)|
 |ProtocolVault 								  |N/A                                                                                                                  |
 
@@ -79,9 +79,9 @@ Use [Faucet](https://test.shiftctrl.money/faucet) to get test tokens ($cbBTC and
 |ReserveRegistry							|[0xDA8A64cDFaeb08b3f28b072b0d4aC371953F5B6E](https://sepolia.basescan.org/address/0xDA8A64cDFaeb08b3f28b072b0d4aC371953F5B6E)|
 |ReserveSafe    							|[0xE8a28176Bed3a53CBF2Bc65B597811909F1A1389](https://sepolia.basescan.org/address/0xE8a28176Bed3a53CBF2Bc65B597811909F1A1389)|
 |PriceOracleManager							|[0xBdFd9503f62A23092504eD072158092B6B3342ac](https://sepolia.basescan.org/address/0xBdFd9503f62A23092504eD072158092B6B3342ac)|
-|PriceOracle								|[0x7a65f5f7b2ba2F15468688c8e98835A3f9be2520](https://sepolia.basescan.org/address/0x7a65f5f7b2ba2F15468688c8e98835A3f9be2520)|
+|PriceOracle								|[0x61AC8eaf1880a9E85Af3C34c0d62588eACD1CB76](https://sepolia.basescan.org/address/0x61AC8eaf1880a9E85Af3C34c0d62588eACD1CB76)|
 |VaultKeeper								|[0x303818F385f1675BBB07dDE155987f6b7041753c](https://sepolia.basescan.org/address/0x303818F385f1675BBB07dDE155987f6b7041753c)|
-|ProtocolVault 								|[0xBC6bef5A3a1211B033322F3730e8DFf2f81AcA84](https://sepolia.basescan.org/address/0xBC6bef5A3a1211B033322F3730e8DFf2f81AcA84)|
+|ProtocolVault 								|N/A                                                                                                                          |
 
 ## Contributing
 

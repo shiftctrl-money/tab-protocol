@@ -77,7 +77,7 @@ contract ReserveSafeTest is Deployer {
         bytes3 sUSD = bytes3(abi.encodePacked("USD"));
         cbBTC.approve(address(vaultManager), 2e8);
         priceData = signer.getUpdatePriceSignature(sUSD, 60000e18, block.timestamp); 
-        vaultManager.createVault(address(cbBTC), 1e18, 10000e18, priceData);
+        vaultManager.createVault(1e18, 10000e18, priceData);
         assertEq(cbBTC.balanceOf(address(reserveSafe)), 2e8);
 
         vm.startPrank(address(vaultManager));

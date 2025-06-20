@@ -15,7 +15,6 @@ import {IVaultKeeper} from "../interfaces/IVaultKeeper.sol";
 import {IReserveRegistry} from "../interfaces/IReserveRegistry.sol";
 import {ITabERC20} from "../interfaces/ITabERC20.sol";
 import {IReserveSafe} from "../interfaces/IReserveSafe.sol";
-import {IProtocolVault} from "../interfaces/IProtocolVault.sol";
 import {IAuctionManager} from "../interfaces/IAuctionManager.sol";
 import {IVaultManager} from "../interfaces/IVaultManager.sol";
 
@@ -100,12 +99,17 @@ contract VaultManager is
         external
         onlyRole(DEPLOYER_ROLE)
     {
-        config = IConfig(_config);
-        reserveRegistry = IReserveRegistry(_reserveRegistry);
-        tabRegistry = ITabRegistry(_tabRegistry);
-        priceOracle = IPriceOracle(_priceOracle);
-        vaultKeeper = IVaultKeeper(_keeper);
-
+        if (address(config) != _config)
+            config = IConfig(_config);
+        if (address(tabRegistry) != _tabRegistry)
+            tabRegistry = ITabRegistry(_tabRegistry);
+        if (address(priceOracle) != _priceOracle)
+            priceOracle = IPriceOracle(_priceOracle);
+        if (address(vaultKeeper) != _keeper)
+            vaultKeeper = IVaultKeeper(_keeper);
+        if (address(reserveRegistry) != _reserveRegistry)
+            reserveRegistry = IReserveRegistry(_reserveRegistry);
+        
         _grantRole(KEEPER_ROLE, _keeper);
         _grantRole(CTRL_ALT_DEL_ROLE, _tabRegistry);
         emit UpdatedContract(_config, _reserveRegistry, _tabRegistry, _priceOracle, _keeper);
@@ -143,39 +147,35 @@ contract VaultManager is
     /**
      * @dev Create vault by depositing BTC reserve token and specify tab amount to mint. 
      * Required allowance to spend reserve, call `approve` on reserve contract before calling `createVault`.
-     * @param _reserveAddr Whitelisted BTC token address. Refer `ReserveRegistry` to add new reserve token.
      * @param _reserveAmt 18-decimals reserve amount to deposit into the new vault. 
      * Required `_reserveAmt` allowance as spender from vault owner.
      * @param _tabAmt Tab amount to be received by vault owner.
      * @param sigPrice Signed tab rate authorized by Tab-Oracle module.
      */
     function createVault(
-        address _reserveAddr, 
         uint256 _reserveAmt, 
         uint256 _tabAmt, 
         IPriceOracle.UpdatePriceData calldata sigPrice
     ) 
         external 
     {
-        if (_reserveAddr == address(0))
+        if (sigPrice.reserve == address(0))
             revert ZeroAddress();
         if (_reserveAmt == 0 || _tabAmt == 0)
             revert ZeroValue();
-        address reserveSafe = reserveRegistry.isEnabledReserve(_reserveAddr);
+        address reserveSafe = reserveRegistry.isEnabledReserve(sigPrice.reserve);
         if (reserveSafe == address(0))
-            revert InvalidReserve(_reserveAddr);
+            revert InvalidReserve(sigPrice.reserve);
         bytes32 tabKey = tabCodeToTabKey(sigPrice.tab);
-        if (tabRegistry.ctrlAltDelTab(tabKey) > 0)
-            revert CtrlAltDelTab(sigPrice.tab);
         if (tabRegistry.frozenTabs(tabKey))
             revert DisabledTab(sigPrice.tab);
 
         // Required allowance on reserve token, transfer reserve to Safe
         SafeERC20.safeTransferFrom(
-            IERC20(_reserveAddr), 
+            IERC20(sigPrice.reserve), 
             sigPrice.updater, 
             reserveSafe, 
-            IReserveSafe(reserveSafe).getNativeTransferAmount(_reserveAddr, _reserveAmt)
+            IReserveSafe(reserveSafe).getNativeTransferAmount(sigPrice.reserve, _reserveAmt)
         );
 
         // Get existed tab's address or create new
@@ -197,10 +197,10 @@ contract VaultManager is
             ownerList.push(sigPrice.updater);
 
         vaultOwners[sigPrice.updater].push(vaultId);
-        vaults[sigPrice.updater][vaultId] = Vault(_reserveAddr, _reserveAmt, tabAddr, _tabAmt, 0, 0);
+        vaults[sigPrice.updater][vaultId] = Vault(sigPrice.reserve, _reserveAmt, tabAddr, _tabAmt, 0, 0);
         ITabERC20(tabAddr).mint(sigPrice.updater, _tabAmt);
 
-        emit NewVault(sigPrice.updater, vaultId, _reserveAddr, _reserveAmt, tabAddr, _tabAmt);
+        emit NewVault(sigPrice.updater, vaultId, sigPrice.reserve, _reserveAmt, tabAddr, _tabAmt);
     }
 
     /**
@@ -224,12 +224,12 @@ contract VaultManager is
             revert DisabledTab(sigPrice.tab);
         if (liquidatedVaults[_vaultId].auctionAddr != address(0))
             revert InvalidLiquidatedVault(_vaultId);
-        if (tabRegistry.ctrlAltDelTab(tabKey) > 0)
-            revert CtrlAltDelTab(sigPrice.tab);
 
         Vault storage v = vaults[sigPrice.updater][_vaultId];
         if(v.reserveAmt == 0)
             revert InvalidVault(sigPrice.updater, _vaultId);
+        if (v.reserveAddr != sigPrice.reserve)
+            revert InvalidReserve(sigPrice.reserve);
         
         vaultKeeper.pushVaultRiskPenalty(sigPrice.updater, _vaultId);
 
@@ -332,6 +332,8 @@ contract VaultManager is
         Vault storage v = vaults[sigPrice.updater][_vaultId];
         if (v.reserveAmt == 0)
             revert InvalidVault(sigPrice.updater, _vaultId);
+        if (v.reserveAddr != sigPrice.reserve)
+            revert InvalidReserve(sigPrice.reserve);
         if (_reserveAmt > v.reserveAmt)
             revert ExcessAmount();
         if (tabRegistry.frozenTabs(tabCodeToTabKey(sigPrice.tab)))
@@ -467,6 +469,8 @@ contract VaultManager is
         Vault storage v = vaults[sigPrice.updater][_vaultId];
         if (v.tabAmt == 0)
             revert InvalidVault(sigPrice.updater, _vaultId);
+        if (v.reserveAddr != sigPrice.reserve)
+            revert InvalidReserve(sigPrice.reserve);
 
         v.osTabAmt += _osRiskPenalty;
         v.pendingOsMint += _osRiskPenalty;
@@ -506,105 +510,6 @@ contract VaultManager is
         );
         v.reserveAmt = 0;
     }
-
-    /**
-     * @dev Governance starts CTRL-ALT-DEL operation on specified Tab.
-     * Upon completion, Tab is having fixed price. Refer `ProtocolVault` to buy/sell.
-     * @param _tab Tab to perform CTRL-ALT-DEL operation.
-     * @param _btcTabRate BTC to Tab rate.
-     * @param _protocolVaultAddr Lock Tab and BTC into specified `ProtocolVault` contract.
-     */
-    function ctrlAltDel(
-        bytes3 _tab, 
-        uint256 _btcTabRate, 
-        address _protocolVaultAddr
-    )
-        external 
-        onlyRole(CTRL_ALT_DEL_ROLE) 
-    {
-        address tabAddr = tabRegistry.tabs(tabCodeToTabKey(_tab));
-        if (tabAddr == address(0))
-            revert ZeroAddress();
-
-        address[] memory addrs = new address[](vaultId);
-        uint256[] memory reserves = new uint256[](vaultId);
-        uint256[] memory tabAmts = new uint256[](vaultId);
-        CtrlAltDelData memory data = CtrlAltDelData(-1, 0, 0, 0, 0);
-
-        // Iterate all vaults of the Tab type
-        for (uint256 i; i < ownerList.length; i++) {
-            uint256[] memory ownerVaultIds = vaultOwners[ownerList[i]];
-
-            for (uint256 n; n < ownerVaultIds.length; n++) {
-                Vault storage v = vaults[ownerList[i]][ownerVaultIds[n]];
-
-                // Vault Tab = CtrlAltDel's Tab && Vault is not liquidated
-                if (v.tab == tabAddr && liquidatedVaults[ownerVaultIds[n]].auctionAddr == address(0)) {
-                    // update risk penalty value (if any)
-                    vaultKeeper.pushVaultRiskPenalty(ownerList[i], ownerVaultIds[n]);
-
-                    uint256 totalOS = v.tabAmt + v.osTabAmt;
-
-                    // Revert if any vault breaches liquidation ratio with supplied _btcTabRate
-                    if (vaultKeeper.isLiquidatingVault(
-                        _tab, 
-                        _reserveValue(_btcTabRate, v.reserveAmt), 
-                        totalOS
-                    )) {
-                        revert LiquidatingVault(ownerList[i], ownerVaultIds[n]);
-                    }
-
-                    // Calc. reserve amount based on reserve type
-                    uint256 vaultReserve = Math.mulDiv(totalOS, 1e18, _btcTabRate);
-
-                    int256 idx = findMatchedAddr(addrs, v.reserveAddr);
-                    if (idx < 0) {
-                        data.uniqReserveCount = data.uniqReserveCount + 1;
-                        addrs[uint256(data.uniqReserveCount)] = v.reserveAddr;
-                        reserves[uint256(data.uniqReserveCount)] = vaultReserve;
-                        tabAmts[uint256(data.uniqReserveCount)] += totalOS;
-                    } else {
-                        reserves[uint256(idx)] += vaultReserve;
-                        tabAmts[uint256(idx)] += totalOS;
-                    }
-                    data.totalReserve += v.reserveAmt;
-
-                    // Accumulate total tab amount
-                    data.totalTabAmt += totalOS;
-                    if (v.pendingOsMint > 0) {
-                        // clear un-minted amount
-                        data.tabToMint += v.pendingOsMint;
-                        v.pendingOsMint = 0;
-                    }
-
-                    // Reserve to be consolidated
-                    data.totalReserveConso += vaultReserve;
-
-                    v.reserveAmt -= vaultReserve; // excess reserve remained in vault.
-                    v.tabAmt = 0;
-                    v.osTabAmt = 0;
-                }
-            }
-        }
-
-        if (data.tabToMint > 0)
-            ITabERC20(tabAddr).mint(config.treasury(), data.tabToMint);
-
-        for (uint256 i; i < addrs.length; i++) {
-            if (addrs[i] == address(0))
-                break;
-            IProtocolVault(_protocolVaultAddr).initCtrlAltDel(addrs[i], reserves[i], tabAddr, tabAmts[i], _btcTabRate);
-            // Unlock reserve from Safe, send to ProtocolVault contract
-            IReserveSafe(reserveRegistry.reserveAddrSafe(addrs[i])).unlockReserve(
-                addrs[i], 
-                _protocolVaultAddr, 
-                reserves[i]
-            );
-        }
-
-        emit CtrlAltDel(_tab, _btcTabRate, data.totalTabAmt, data.totalReserve, data.totalReserveConso);
-    }
-
 
     function tabCodeToTabKey(bytes3 code) public pure returns(bytes32) {
         return keccak256(abi.encodePacked(code));

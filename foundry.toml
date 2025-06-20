@@ -5,16 +5,22 @@ out = "out"
 libs = ["node_modules", "lib"]
 test = "test"
 cache_path = "forge-cache"
-viaIR = true
+# Via Intermediate Representation
+viaIR = false
 evm_version = "shanghai"
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 
-ffi = true
-ast = true
-build_info = true
+# Foreign Function Interface
+ffi = false
+# Abstract Syntax Tree
+ast = false
+# Build Information
+build_info = false
 extra_output = ['storageLayout', 'evm.gasEstimates']
 fs_permissions = [{ access = "read", path = "./"}]
+
+no_match_test = "test_deploy_testnet"
 
 [rpc_endpoints]
 anvil = "http://127.0.0.1:8545"

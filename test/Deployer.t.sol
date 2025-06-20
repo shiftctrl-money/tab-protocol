@@ -23,7 +23,6 @@ import {ReserveSafe} from "../contracts/reserve/ReserveSafe.sol";
 import {ReserveRegistry} from "../contracts/reserve/ReserveRegistry.sol";
 import {AuctionManager} from "../contracts/core/AuctionManager.sol";
 import {Config} from "../contracts/core/Config.sol";
-import {ProtocolVault} from "../contracts/core/ProtocolVault.sol";
 import {TabRegistry} from "../contracts/core/TabRegistry.sol";
 import {VaultKeeper} from "../contracts/core/VaultKeeper.sol";
 import {VaultManager} from "../contracts/core/VaultManager.sol";
@@ -84,10 +83,11 @@ abstract contract Deployer is Test {
     VaultKeeper vaultKeeper;
     AuctionManager auctionManager;
     VaultUtils vaultUtils;
-    ProtocolVault protocolVault;
     Signer signer;
 
     IPriceOracle.UpdatePriceData priceData;
+    string public constant strReserve = "cbBTC";
+    bytes32 public pricePairKeyUSD = keccak256(abi.encodePacked(strReserve, "/s", bytes3(abi.encodePacked("USD"))));  
 
     constructor() {
         owner = address(this);
@@ -136,9 +136,8 @@ abstract contract Deployer is Test {
             priceOracleManager = PriceOracleManager(0xBdFd9503f62A23092504eD072158092B6B3342ac);
             priceOracle = PriceOracle(0x7a65f5f7b2ba2F15468688c8e98835A3f9be2520);
             vaultKeeper = VaultKeeper(0x303818F385f1675BBB07dDE155987f6b7041753c);
-            protocolVault = ProtocolVault(0xBC6bef5A3a1211B033322F3730e8DFf2f81AcA84);
 
-            signer = new Signer(address(priceOracle), owner);
+            signer = new Signer(address(priceOracle), owner, address(cbBTC));
             if (secureSignerAddr != address(0)) { // applicable when deployment is replaced by other secure address
                 signer.updateSigner(
                     secureSignerAddr, 
@@ -188,26 +187,8 @@ abstract contract Deployer is Test {
             priceOracleManager = PriceOracleManager(0x5f6c5A786a1Aa89d3B18606f93Dc6bfA011a2fBC);
             priceOracle = PriceOracle(0x8c3Fd83a9dFEC3D5e389aea60cA980A2e72A9A5A);
             vaultKeeper = VaultKeeper(0xBbFD14d040b7E3b3cC3eef52DCB1E84Cb3E397C5);
-            bytes memory protocolVaultInitData = abi.encodeWithSignature(
-                "initialize(address,address,address,address)",
-                address(governanceTimelockController),  // Governance controller
-                address(tabProxyAdmin),        // upgrader
-                address(vaultManager),         // Vault manager
-                address(reserveSafe)
-            );
-            ProtocolVault protocolVaultImpl = new ProtocolVault(); // implementation
-            address protocolVaultAddr = address(
-                new TransparentUpgradeableProxy(
-                    address(protocolVaultImpl), address(tabProxyAdmin), protocolVaultInitData
-                )
-            );
-            protocolVault = ProtocolVault(protocolVaultAddr);
-            vm.startPrank(address(governanceTimelockController));
-            tabRegistry.setProtocolVaultAddress(protocolVaultAddr);
-            vm.stopPrank();
-            console.log("protocolVault: ", address(protocolVault));
             
-            signer = new Signer(address(priceOracle), address(this));
+            signer = new Signer(address(priceOracle), address(this), address(cbBTC));
             vm.startPrank(address(governanceTimelockController));
             priceOracle.grantRole(keccak256("SIGNER_ROLE"), 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266);
             vm.stopPrank();
@@ -458,28 +439,11 @@ abstract contract Deployer is Test {
 
             config.setVaultKeeperAddress(vaultKeeperAddr);
 
-            // ProtocolVault
-            bytes memory protocolVaultInitData = abi.encodeWithSignature(
-                "initialize(address,address,address,address)",
-                governance,                 // Governance controller
-                address(tabProxyAdmin),     // upgrader
-                vaultManagerAddr,           // Vault manager
-                address(reserveSafe)
-            );
-            ProtocolVault protocolVaultImpl = new ProtocolVault(); // implementation
-            address protocolVaultAddr = address(
-                new TransparentUpgradeableProxy(
-                    address(protocolVaultImpl), address(tabProxyAdmin), protocolVaultInitData
-                )
-            );
-            protocolVault = ProtocolVault(protocolVaultAddr);
             // Todo (before executing ctrlAltDel operation): 
             // Revoke MINTER_ROLE from VaultManager on targeted tab.
             // Grant MINTER_ROLE to ProtocolVault on targeted tab.
 
-            tabRegistry.setProtocolVaultAddress(protocolVaultAddr);
-
-            console.log("protocolVault: ", address(protocolVault));
+            // tabRegistry.setProtocolVaultAddress(protocolVaultAddr);
 
             governanceAction.addPriceOracleProvider(
                 0x346Ed1282B89D8c948b404C3c3599f8D8ba2AA0e, // provider
@@ -506,22 +470,26 @@ abstract contract Deployer is Test {
                 bytes32(0)  // whitelistedIPAddr: allow sending from any IP
             );
 
-            signer = new Signer(address(priceOracle), owner);
-
-            // remove permissions
-            tabFactory.transferOwnership(governance);
-            vaultManager.renounceRole(keccak256("DEPLOYER_ROLE"), owner);
-            governanceAction.renounceRole(MAINTAINER_ROLE, owner);
-            tabRegistry.renounceRole(MAINTAINER_ROLE, owner);
-            reserveRegistry.renounceRole(MAINTAINER_ROLE, owner);
-            config.renounceRole(MAINTAINER_ROLE, owner);
-            priceOracleManager.renounceRole(MAINTAINER_ROLE, owner);
-
-            ctrl.grantRole(UPGRADER_ROLE, governance);
-            ctrl.grantRole(UPGRADER_ROLE, emergencyGov);
-            ctrl.beginDefaultAdminTransfer(governance);
-            // After 1 day grace period, call: governanceController.acceptDefaultAdminTransfer()
+            _prep();
         }
+    }
+
+    function _prep() internal {
+        signer = new Signer(address(priceOracle), owner, address(cbBTC));
+
+        // remove permissions
+        tabFactory.transferOwnership(address(governanceTimelockController));
+        vaultManager.renounceRole(keccak256("DEPLOYER_ROLE"), owner);
+        governanceAction.renounceRole(MAINTAINER_ROLE, owner);
+        tabRegistry.renounceRole(MAINTAINER_ROLE, owner);
+        reserveRegistry.renounceRole(MAINTAINER_ROLE, owner);
+        config.renounceRole(MAINTAINER_ROLE, owner);
+        priceOracleManager.renounceRole(MAINTAINER_ROLE, owner);
+
+        ctrl.grantRole(UPGRADER_ROLE, address(governanceTimelockController));
+        ctrl.grantRole(UPGRADER_ROLE, address(emergencyTimelockController));
+        ctrl.beginDefaultAdminTransfer(address(governanceTimelockController));
+        // After 1 day grace period, call: governanceController.acceptDefaultAdminTransfer()
     }
 
 }

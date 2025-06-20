@@ -143,7 +143,7 @@ contract TabRegistryTest is Deployer {
         tabRegistry.setProtocolVaultAddress(address(0));
 
         vm.expectEmit();
-        emit ITabRegistry.UpdatedProtocolVaultAddress(address(protocolVault), owner);
+        emit ITabRegistry.UpdatedProtocolVaultAddress(address(0), owner);
         tabRegistry.setProtocolVaultAddress(owner);
         vm.stopPrank();
     }

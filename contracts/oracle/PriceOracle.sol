@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {AccessControlDefaultAdminRules} 
-    from "@openzeppelin/contracts/access/extensions/AccessControlDefaultAdminRules.sol";
+    from "@openzeppelin/contracts/access/extensions/AccessControlDefaultAdminRules.sol";   
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
@@ -20,23 +20,22 @@ contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdmi
     bytes32 public constant TAB_REGISTRY_ROLE = keccak256("TAB_REGISTRY_ROLE");
     bytes32 public constant PRICE_ORACLE_MANAGER_ROLE = keccak256("PRICE_ORACLE_MANAGER_ROLE");
 
-    mapping(bytes3 => uint256) private prices; // 18-decimals, tab code : price (base currency BTC, quote currency TAB)
-    mapping(bytes3 => uint256) public lastUpdated;
+    // key: keccak256("RESERVE/TAB"), e.g. keccak256("cbBTC/sTRY") or keccak256("BTC/sUSD") 
+    mapping(bytes32 => PricePair) public pricePairs; 
+    mapping(address => string) public reserveSymbols; // store reserve contract's ERC20.symbol() result
 
     // EIP712
     mapping(address => uint256) public nonces;
-    bytes32 private constant _DATA_TYPEHASH = keccak256("UpdatePriceData(address owner,address updater,bytes3 tab,uint256 price,uint256 timestamp,uint256 nonce)");
+    bytes32 private constant _DATA_TYPEHASH = keccak256("UpdatePriceData(uint256 price,uint256 timestamp,address owner,address updater,address reserve,bytes3 tab,uint256 nonce)");
 
-    // Maintain in PriceOracleManager
+    // Maintained in PriceOracleManager, duplication for quick access
     uint256 public inactivePeriod; // allowed lastUpdated inactive for X seconds
 
-    // Maintain in TabRegistry
+    // Maintained in TabRegistry
     uint256 public peggedTabCount;
     bytes3[] public peggedTabList;
     mapping(bytes3 => bytes3) public peggedTabMap; // e.g. XXX pegged to USD
     mapping(bytes3 => uint256) public peggedTabPriceRatio;
-    // ctrl-alt-del
-    mapping(bytes3 => uint256) public ctrlAltDelTab; // >0 when the tab(key) is now set to fixed price
 
     /**
      * 
@@ -78,6 +77,7 @@ contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdmi
         inactivePeriod = 1 hours;
     }
 
+    /// @dev Pause price update from function `updatePrice` and `setDirectPrice`.
     function pause() public onlyRole(PAUSER_ROLE) {
         _pause();
     }
@@ -99,6 +99,25 @@ contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdmi
     }
 
     /**
+     * @dev When reserve contract does not support ERC20.symbol(), set it here manually.
+     * @param _reserveAddr Reserve contract address.
+     * @param _symbol Reserve symbol.
+     */
+    function setReserveSymbol(
+        address _reserveAddr, 
+        string calldata _symbol
+    ) 
+        external 
+        onlyRole(PRICE_ORACLE_MANAGER_ROLE) 
+    {
+        if (_reserveAddr == address(0))
+            revert ZeroValue();
+        if (bytes(_symbol).length == 0)
+            revert InvalidSymbol(_reserveAddr);
+        reserveSymbols[_reserveAddr] = _symbol;
+    }
+
+    /**
      * @dev Triggered by `TabRegistry`. Propagate to call this when creating new pegged tab.
      * @param _ptab Pegged Tab code.
      * @param _tab Pegged to existing Tab.
@@ -115,9 +134,6 @@ contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdmi
     {
         if (_priceRatio == 0)
             revert ZeroValue();
-        uint256 peggedPrice = Math.mulDiv(prices[_tab], _priceRatio, 100);
-        if (peggedPrice == 0)
-            revert ZeroValue();
 
         // new pegged tab
         if (peggedTabMap[_ptab] == 0x0) {
@@ -129,33 +145,17 @@ contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdmi
     }
 
     /**
-     * @dev Triggered by `TabRegistry`. Propagate to call this to perform Ctrl-Alt-Del.
-     * @param _tab Tab code to perform Ctrl-Alt-Del operation.
-     * @param fixedPrice BTC to Tab rate to be fixed.
-     */
-    function ctrlAltDel(
-        bytes3 _tab, 
-        uint256 fixedPrice
-    ) 
-        external 
-        onlyRole(TAB_REGISTRY_ROLE) 
-    {
-        emit UpdatedPrice(_tab, prices[_tab], fixedPrice, block.timestamp);
-        prices[_tab] = fixedPrice;
-        lastUpdated[_tab] = block.timestamp;
-        ctrlAltDelTab[_tab] = fixedPrice; // price is fixed at this point
-    }
-
-    /**
      * @dev Governance set price directly (only on emergency scenario).
+     * @param reserve Reserve symbol, e.g. "cbBTC", "BTC"
      * @param tabCode Tab Code.
-     * @param price BTC/TAB Rate.
-     * @param _lastUpdated Timestamp of rate update.
+     * @param price Price rate.
+     * @param timestamp Timestamp of rate update.
      */
     function setDirectPrice(
+        string calldata reserve,
         bytes3 tabCode, 
         uint256 price, 
-        uint256 _lastUpdated
+        uint256 timestamp
     ) 
         external 
         onlyRole(FEEDER_ROLE) 
@@ -164,22 +164,25 @@ contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdmi
 
         if (price == 0)
             revert ZeroPrice();
+        
+        bytes32 pricePairKey = getPricePairKeyByTab(reserve, tabCode);
+        PricePair storage pricePair = pricePairs[pricePairKey];
 
-        if (_lastUpdated <= lastUpdated[tabCode])
-            revert OutdatedPrice(tabCode, _lastUpdated);
+        if (timestamp <= pricePair.timestamp)
+            revert OutdatedPrice(pricePairKey, timestamp);
 
-        if (ctrlAltDelTab[tabCode] > 0)
-            revert PostCtrlAltDelFixedPrice();
-
-        emit UpdatedPrice(tabCode, prices[tabCode], price, _lastUpdated);
-        prices[tabCode] = price;
-        lastUpdated[tabCode] = _lastUpdated;
+        emit UpdatedPrice(pricePairKey, pricePair.price, price, timestamp);
+        pricePair.price = price;
+        pricePair.timestamp = timestamp;
     }
 
     /**
      * @dev On-demand (passive) tab rate update.
      * When user performs vault operation, the transaction will include 
      * latest rate signed by authorized oracle service.
+     * For pegged tab, `priceData.tab` is pegged tab code (e.g. XXX) and 
+     * `priceData.price` is the pegged tab rate (BTC/XXX rate).
+     * System calc. pegging tab rate and store it.
      * @param priceData Signed Tab rate by authorized oracle service.
      */
     function updatePrice(
@@ -190,21 +193,22 @@ contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdmi
         returns (uint256) 
     {
         _requireNotPaused();
-
-        // not applicable on ctrl-alt-del tab, returns its fixed rate
-        if (ctrlAltDelTab[priceData.tab] > 0)
-            return _getPrice(priceData.tab);
         
-        if (priceData.timestamp > lastUpdated[priceData.tab]) { 
+        string memory reserveSymbol = _getReserveSymbol(priceData.reserve);
+        bytes32 pricePairKey = getPricePairKeyByTab(reserveSymbol, priceData.tab);
+        PricePair storage pricePair = pricePairs[pricePairKey];
+        
+        if (priceData.timestamp > pricePair.timestamp) { 
             if (priceData.price == 0)
                 revert ZeroPrice();
             bytes32 structHash = keccak256(abi.encode(
                 _DATA_TYPEHASH, 
-                priceData.owner,
-                priceData.updater,
-                priceData.tab,
                 priceData.price,
                 priceData.timestamp,
+                priceData.owner,
+                priceData.updater,
+                priceData.reserve,
+                priceData.tab,
                 nonces[priceData.updater]
             ));
         
@@ -221,85 +225,144 @@ contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdmi
                 revert InvalidSignerRole();
 
             if (block.timestamp > (priceData.timestamp + inactivePeriod))
-                revert ExpiredRate(block.timestamp, priceData.timestamp, inactivePeriod);
+                revert ExpiredRate(pricePairKey, block.timestamp, priceData.timestamp, inactivePeriod);
             
             nonces[priceData.updater] += 1;
 
-            // Regular (non-pegged) tab
+            // Regular Tab (Non-pegged)
             if (peggedTabMap[priceData.tab] == 0x0) {
-                if (priceData.price == prices[priceData.tab]) {
-                    lastUpdated[priceData.tab] = priceData.timestamp;
-                    return priceData.price;
-                } else {
-                    emit UpdatedPrice(
-                        priceData.tab, 
-                        prices[priceData.tab], 
-                        priceData.price, 
-                        priceData.timestamp
-                    );
-                    prices[priceData.tab] = priceData.price;
-                    lastUpdated[priceData.tab] = priceData.timestamp;
-                    
-                    return priceData.price;
+                emit UpdatedPrice(
+                    pricePairKey, 
+                    pricePair.price, 
+                    priceData.price, 
+                    priceData.timestamp
+                );
+                if (priceData.price == pricePair.price) {
+                    if (priceData.timestamp > pricePair.timestamp)
+                        pricePair.timestamp = priceData.timestamp;
+                } else {  
+                    pricePair.price = priceData.price;
+                    pricePair.timestamp = priceData.timestamp;
                 }
+                return priceData.price;
             } else { // Pegged tab existed, 
                 // i.e. when PEG pegged to USD, calc. & update USD rate based on supplied PEG
-                bytes3 peggedTab = peggedTabMap[priceData.tab];
+                bytes3 peggedTab = peggedTabMap[priceData.tab]; // e.g. priceData.tab = XXX, peggedTab = USD
                 uint256 peggedTabRate = Math.mulDiv(
                     priceData.price, 
                     100, 
                     peggedTabPriceRatio[priceData.tab]
+                ); // e.g. calc. USD rate
+
+                bytes32 peggedPricePairKey = getPricePairKeyByTab(reserveSymbol, peggedTab);
+                PricePair storage peggedPricePair = pricePairs[peggedPricePairKey];
+
+                // Pegged Tab, e.g. XXX 
+                emit UpdatedPrice(
+                    pricePairKey,
+                    pricePair.price, 
+                    priceData.price, 
+                    priceData.timestamp
                 );
-                if (peggedTabRate == prices[peggedTab])
-                    return priceData.price;
-                else {
-                    emit UpdatedPrice(
-                        peggedTab, 
-                        prices[peggedTab], 
-                        peggedTabRate, 
-                        priceData.timestamp
-                    );
-                    prices[peggedTab] = peggedTabRate;
-                    lastUpdated[peggedTab] = priceData.timestamp;
-                    
-                    return priceData.price;
-                }
+                pricePair.price = priceData.price;
+                pricePair.timestamp = priceData.timestamp;
+
+                // Tab rate, e.g. USD
+                emit UpdatedPrice(
+                    peggedPricePairKey, 
+                    peggedPricePair.price, 
+                    peggedTabRate, 
+                    priceData.timestamp
+                );
+                peggedPricePair.price = peggedTabRate;
+                peggedPricePair.timestamp = priceData.timestamp;
+
+                return priceData.price;
             }
         } else {
-            return _getPrice(priceData.tab);
+            return _getPrice(pricePairKey);
         }
     }
 
     /**
      * 
-     * @dev Get tab rate. If the rate's lastUpdated + inactivePeriod is 
+     * @dev Return Tab rate when the rate's last updated timestamp + inactivePeriod is 
      * less than block.timestamp, 
      */
-    function getPrice(bytes3 _tab) external view returns (uint256) {
-        return _getPrice(_tab);
+    function getPrice(bytes32 pricePairKey) external view returns (uint256) {
+        return _getPrice(pricePairKey);
     }
 
     /**
-     * @dev Get tab rate, ignore lastUpdated check.
+     * @dev Get tab rate, ignore last updated timestamp check.
      */
-    function getOldPrice(bytes3 _tab) external view returns (uint256) {
+    function getOldPrice(bytes32 pricePairKey) public view returns (uint256) {
+        return pricePairs[pricePairKey].price;
+    }
+
+    /**
+     * @dev Mapping key used for pricePair.
+     * @param _reserve Reserve symbol, e.g. "cbBTC", "BTC".
+     * @param _tab Tab code.
+     */
+    function getPricePairKeyByTab(
+        string memory _reserve,
+        bytes3 _tab
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(_reserve, "/s", _tab));  
+    }
+
+    /**
+     * @dev Get rate without checking timestamp.
+     * @param _reserve Reserve symbol, e.g. "cbBTC", "BTC".
+     * @param _tab Tab code or pegged tab code.
+     */
+    function getCalcPrice(string calldata _reserve, bytes3 _tab) external view returns (uint256) {
         if (peggedTabMap[_tab] == 0x0) {
-            return prices[_tab];
+            return getOldPrice(getPricePairKeyByTab(_reserve, _tab));
         } else {
-            return Math.mulDiv(prices[peggedTabMap[_tab]], peggedTabPriceRatio[_tab], 100);
+            PricePair memory pricePair = pricePairs[getPricePairKeyByTab(_reserve, _tab)];
+            if (pricePair.timestamp > 0) {
+                return pricePair.price;
+            } else {
+                PricePair memory peggedPricePair = pricePairs[getPricePairKeyByTab(_reserve, peggedTabMap[_tab])];
+                if (peggedPricePair.price > 0)
+                    return Math.mulDiv(peggedPricePair.price, peggedTabPriceRatio[_tab], 100);
+                else
+                    return 0; // no price available
+            }
         }
     }
 
-    function _getPrice(bytes3 _tab) internal view returns(uint256) {
-        if (peggedTabMap[_tab] == 0x0) {
-            if (block.timestamp > (lastUpdated[_tab] + inactivePeriod))
-                revert ExpiredRate(block.timestamp, lastUpdated[_tab], inactivePeriod);
-            return prices[_tab];
-        } else {
-            if (block.timestamp > (lastUpdated[peggedTabMap[_tab]] + inactivePeriod))
-                revert ExpiredRate(block.timestamp, lastUpdated[peggedTabMap[_tab]], inactivePeriod);
-            return Math.mulDiv(prices[peggedTabMap[_tab]], peggedTabPriceRatio[_tab], 100);
-        }
+    /**
+     * @dev Get price from pricePairs mapping. Check if the price is expired before returning.
+     * @param _pricePairKey Price pair key, e.g. keccak256("cbBTC/sTRY") or keccak256("BTC/sUSD").
+     */
+    function _getPrice(bytes32 _pricePairKey) internal view returns(uint256) {
+        PricePair memory pricePair = pricePairs[_pricePairKey];
+        if (block.timestamp > (pricePair.timestamp + inactivePeriod))
+            revert ExpiredRate(_pricePairKey, block.timestamp, pricePair.timestamp, inactivePeriod); 
+        return pricePair.price;
+    }
+
+    /**
+     * @dev Get reserve symbol from reserveSymbols mapping or call reserve contract's symbol() function.
+     * @param _reserveAddr Reserve contract address.
+     * @return symbol Reserve symbol.
+     */
+    function _getReserveSymbol(address _reserveAddr) internal returns(string memory symbol) {
+        symbol = reserveSymbols[_reserveAddr];
+        if (bytes(symbol).length > 0)
+            return symbol;
+
+        (bool success, bytes memory data) = _reserveAddr.staticcall(abi.encodeWithSignature("symbol()"));
+        if (!success)
+            revert InvalidSymbol(_reserveAddr);
+        symbol = abi.decode(data, (string));
+        if (bytes(symbol).length == 0)
+            revert InvalidSymbol(_reserveAddr);
+
+        reserveSymbols[_reserveAddr] = abi.decode(data, (string));
     }
 
 }

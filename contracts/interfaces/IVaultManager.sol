@@ -18,14 +18,6 @@ interface IVaultManager {
         address auctionAddr;
     }
 
-    struct CtrlAltDelData {
-        int256 uniqReserveCount; // index point to unique reserve type
-        uint256 totalTabAmt; // total tab amount of the vaults to be depegged
-        uint256 tabToMint; // total tab amount pending to mint
-        uint256 totalReserve; // total reserve amount of the reserve type
-        uint256 totalReserveConso; // total reserve to be consolidated
-    }
-
     function ownerList(uint256) external view returns(address);
     function vaultOwners(address, uint256) external view returns(uint256);
     function getVaults(address, uint256) external view returns(Vault memory);
@@ -46,7 +38,6 @@ interface IVaultManager {
     function getAllVaultIDByOwner(address _owner) external view returns (uint256[] memory);
 
     function createVault(
-        address _reserveAddr, 
         uint256 _reserveAmt, 
         uint256 _tabAmt, 
         IPriceOracle.UpdatePriceData calldata sigPrice
@@ -92,13 +83,6 @@ interface IVaultManager {
         uint256 _vaultId,
         uint256 _osRiskPenalty,
         IPriceOracle.UpdatePriceData calldata sigPrice
-    )
-        external;
-        
-    function ctrlAltDel(
-        bytes3 _tab, 
-        uint256 _btcTabRate, 
-        address _protocolVaultAddr
     )
         external;
 
@@ -156,23 +140,14 @@ interface IVaultManager {
         address tabAddr, 
         uint256 startPrice
     );
-    event CtrlAltDel(
-        bytes3 indexed tab, 
-        uint256 btcTabRate, 
-        uint256 totalTabs, 
-        uint256 totalReserve, 
-        uint256 consoReserve
-    );
 
     error ZeroAddress();
     error ZeroValue();
     error InvalidReserve(address invalidReserveToken);
-    error CtrlAltDelTab(bytes3 tab);
     error DisabledTab(bytes3 tab);
     error ExceededWithdrawable(uint256 withdrawable);
     error InvalidLiquidatedVault(uint256 vaultId);
     error ExcessAmount();
     error InvalidVault(address vaultOwner, uint256 vaultId);
-    error LiquidatingVault(address vaultOwner, uint256 vaultId);
 
 }

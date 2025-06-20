@@ -22,6 +22,12 @@ contract VaultKeeperTest is Deployer {
     bytes3 vaultTab;
     uint256 listIndex;
 
+    // workaround: stack too deep
+    bytes3 usd = bytes3(abi.encodePacked("USD"));
+    bytes3 myr = bytes3(abi.encodePacked("MYR"));
+    uint256 usdPrice = 25738e18;
+    uint256 myrPrice = 174603438331485931421445;
+
     function setUp() public {
         deploy();
 
@@ -174,7 +180,6 @@ contract VaultKeeperTest is Deployer {
     }
 
     function test_checkVault() public {
-        bytes3 usd = bytes3(abi.encodePacked("USD"));
         uint256 assignedPrice = 25738e18;
         uint256 vaultId;
 
@@ -184,7 +189,7 @@ contract VaultKeeperTest is Deployer {
         vm.startPrank(address(governanceTimelockController));
         governanceAction.createNewTab(usd); // USD
         nextBlock(1);
-        priceOracle.setDirectPrice(usd, assignedPrice, block.timestamp);
+        priceOracle.setDirectPrice(strReserve, usd, assignedPrice, block.timestamp);
 
         nextBlock(1);
         vm.startPrank(eoa_accounts[0]);
@@ -196,7 +201,6 @@ contract VaultKeeperTest is Deployer {
         // create vault
         // current reserve ratio = 25738 / 14298 = 180.01%, just slightly above minimum reserve ratio
         vaultManager.createVault(
-            address(cbBTC), 
             1e18, 
             14298e18, 
             signer.getUpdatePriceSignature(usd, assignedPrice, block.timestamp)
@@ -226,9 +230,9 @@ contract VaultKeeperTest is Deployer {
         // price dropped, RR below 180%, start charging risk penalty
         assignedPrice = 20000e18; 
         vm.startPrank(address(governanceTimelockController));
-        priceOracle.setDirectPrice(usd, assignedPrice, block.timestamp);
+        priceOracle.setDirectPrice(strReserve, usd, assignedPrice, block.timestamp);
         vm.stopPrank();
-        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, priceOracle.getPrice(usd));
+        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, priceOracle.getPrice(pricePairKeyUSD));
         assertEq(price, assignedPrice);
         assertEq(osTab, 14298e18);
         assertEq(reserveValue, 20000e18);
@@ -302,7 +306,7 @@ contract VaultKeeperTest is Deployer {
         nextBlock(106); // 10 frames passed
 
         vm.startPrank(address(governanceTimelockController));
-        priceOracle.setDirectPrice(usd, assignedPrice, block.timestamp);
+        priceOracle.setDirectPrice(strReserve, usd, assignedPrice, block.timestamp);
         vm.stopPrank();
 
         (,,,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, assignedPrice);
@@ -335,11 +339,6 @@ contract VaultKeeperTest is Deployer {
     }
 
     function test_checkVault_2ndLargestVaultDelta_thenLiquidate() public {
-        bytes3 usd = bytes3(abi.encodePacked("USD"));
-        bytes3 myr = bytes3(abi.encodePacked("MYR"));
-        uint256 usdPrice = 25738e18;
-        uint256 myrPrice = 174603438331485931421445;
-
         vm.startPrank(deployer);
         cbBTC.mint(eoa_accounts[0], 2e8);
 
@@ -347,8 +346,8 @@ contract VaultKeeperTest is Deployer {
         governanceAction.createNewTab(usd); // USD
         governanceAction.createNewTab(myr); // MYR
         nextBlock(1);
-        priceOracle.setDirectPrice(usd, usdPrice, block.timestamp);
-        priceOracle.setDirectPrice(myr, myrPrice, block.timestamp);
+        priceOracle.setDirectPrice(strReserve, usd, usdPrice, block.timestamp);
+        priceOracle.setDirectPrice(strReserve, myr, myrPrice, block.timestamp);
 
         nextBlock(1);
         vm.startPrank(eoa_accounts[0]);
@@ -360,13 +359,11 @@ contract VaultKeeperTest is Deployer {
         // create vault
         // current reserve ratio = 25738 / 14298 = 180.01%, just slightly above minimum reserve ratio
         vaultManager.createVault(
-            address(cbBTC), 
             1e18, 
             14298e18, 
             signer.getUpdatePriceSignature(usd, usdPrice, block.timestamp)
         );
         vaultManager.createVault(
-            address(cbBTC), 
             1e18, 
             97001910184158850789691, 
             signer.getUpdatePriceSignature(myr, myrPrice, block.timestamp)
@@ -409,8 +406,8 @@ contract VaultKeeperTest is Deployer {
         vm.startPrank(address(governanceTimelockController));
         usdPrice = 20000e18; // BTC/USD 20000
         myrPrice = 150000e18;
-        priceOracle.setDirectPrice(usd, usdPrice, block.timestamp);
-        priceOracle.setDirectPrice(myr, myrPrice, block.timestamp);
+        priceOracle.setDirectPrice(strReserve, usd, usdPrice, block.timestamp);
+        priceOracle.setDirectPrice(strReserve, myr, myrPrice, block.timestamp);
 
         (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], 1, usdPrice);
         assertEq(price, 20000e18);
@@ -476,8 +473,8 @@ contract VaultKeeperTest is Deployer {
         usdPrice = 19000e18; // BTC/USD 19000
         myrPrice = 155000e18;
         vm.startPrank(address(governanceTimelockController));
-        priceOracle.setDirectPrice(usd, usdPrice, block.timestamp);
-        priceOracle.setDirectPrice(myr, myrPrice, block.timestamp);
+        priceOracle.setDirectPrice(strReserve, usd, usdPrice, block.timestamp);
+        priceOracle.setDirectPrice(strReserve, myr, myrPrice, block.timestamp);
         
         (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], 1, usdPrice);
         assertEq(price, 19000e18);
@@ -542,8 +539,8 @@ contract VaultKeeperTest is Deployer {
         usdPrice = 15000e18;
         myrPrice = 100000e18;
         vm.startPrank(address(governanceTimelockController));
-        priceOracle.setDirectPrice(usd, usdPrice, block.timestamp);
-        priceOracle.setDirectPrice(myr, myrPrice, block.timestamp);
+        priceOracle.setDirectPrice(strReserve, usd, usdPrice, block.timestamp);
+        priceOracle.setDirectPrice(strReserve, myr, myrPrice, block.timestamp);
 
         (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], 1, usdPrice);
         assertEq(price, 15000e18);
@@ -610,7 +607,6 @@ contract VaultKeeperTest is Deployer {
 
     /// @dev selectively clearing risk penalty of a vault
     function test_pushVaultRiskPenalty() public {
-        bytes3 usd = bytes3(abi.encodePacked("USD"));
         uint256 assignedPrice = 10000e18;
 
         vm.startPrank(deployer);
@@ -619,7 +615,7 @@ contract VaultKeeperTest is Deployer {
         vm.startPrank(address(governanceTimelockController));
         governanceAction.createNewTab(usd); // USD
         nextBlock(1);
-        priceOracle.setDirectPrice(usd, assignedPrice, block.timestamp);
+        priceOracle.setDirectPrice(strReserve, usd, assignedPrice, block.timestamp);
 
         nextBlock(1);
         vm.startPrank(eoa_accounts[0]);
@@ -631,7 +627,6 @@ contract VaultKeeperTest is Deployer {
         // create vault
         // current reserve ratio = 25738 / 14298 = 180.01%, just slightly above minimum reserve ratio
         vaultManager.createVault(
-            address(cbBTC), 
             1e18, 
             5000e18, 
             signer.getUpdatePriceSignature(usd, assignedPrice, block.timestamp)
@@ -642,7 +637,7 @@ contract VaultKeeperTest is Deployer {
         assignedPrice = 8000e18;
 
         vm.startPrank(address(governanceTimelockController));
-        priceOracle.setDirectPrice(usd, assignedPrice, block.timestamp);
+        priceOracle.setDirectPrice(strReserve, usd, assignedPrice, block.timestamp);
 
         (
             bytes3 tab,

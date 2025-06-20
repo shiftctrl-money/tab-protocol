@@ -7,7 +7,7 @@ import {CREATE3} from "lib/solady/src/utils/CREATE3.sol";
 import {TabERC20} from "./TabERC20.sol";
 
 /**
- * @dev Dependency on https://github.com/SKYBITDev3/SKYBIT-Keyless-Deployment to create fixed contract address.
+ * @dev Dependency on https://github.com/ZeframLou/create3-factory to create fixed TabFactory contract address.
  * @title  Factory to create new Tab contract.
  * @notice Refer https://www.shiftctrl.money for details.
  */

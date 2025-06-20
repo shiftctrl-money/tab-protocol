@@ -7,12 +7,12 @@ import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC2
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /** 
- * @dev Simulate CBBTC deployed on 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf
+ * @dev Simulate cbBTC deployed on 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf
  * This is used on local or testnet.
  */
 contract CBBTC is ERC20, ERC20Burnable, Ownable {
     constructor(address initialOwner)
-        ERC20("TestCBBTC", "CBBTC")
+        ERC20("TestCBBTC", "cbBTC")
         Ownable(initialOwner)
     {
         _mint(msg.sender, 100 * (10 ** decimals()));

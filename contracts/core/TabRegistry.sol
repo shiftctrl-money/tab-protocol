@@ -258,10 +258,10 @@ contract TabRegistry is ITabRegistry, AccessControlDefaultAdminRules {
             revert ZeroValue();
         if (ctrlAltDelTab[tabKey] > 0)
             revert ExecutedDepeg();
-        
-        IVaultManager(vaultManager).ctrlAltDel(_tab, _btcTabRate, protocolVault);
+        // Disabled Ctrl-Alt-Del operation for now. DO NOT call from governance.
+        // IVaultManager(vaultManager).ctrlAltDel(_tab, _btcTabRate, protocolVault);
 
-        IPriceOracle(IPriceOracleManager(priceOracleManager).priceOracle()).ctrlAltDel(_tab, _btcTabRate);
+        // IPriceOracle(IPriceOracleManager(priceOracleManager).priceOracle()).ctrlAltDel(_tab, _btcTabRate);
 
         ctrlAltDelTab[tabKey] = _btcTabRate;
 

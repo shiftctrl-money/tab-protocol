@@ -11,7 +11,7 @@ import {IPriceOracle} from "../contracts/interfaces/IPriceOracle.sol";
 contract Signer is Test {
     bytes32 private constant _TYPE_HASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-    bytes32 _DATA_TYPEHASH = keccak256("UpdatePriceData(address owner,address updater,bytes3 tab,uint256 price,uint256 timestamp,uint256 nonce)");
+    bytes32 _DATA_TYPEHASH = keccak256("UpdatePriceData(uint256 price,uint256 timestamp,address owner,address updater,address reserve,bytes3 tab,uint256 nonce)");
 
     string name;
     string version;
@@ -20,13 +20,15 @@ contract Signer is Test {
     address public authorizedAddr;
     address public priceOracle;
     address public updater;
+    address public reserveAddress;
     
     uint256 priKey;
 
-    constructor(address _priceOracle, address _updater) {
+    constructor(address _priceOracle, address _updater, address _reserveAddress) {
         authorizedAddr = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
         priceOracle = _priceOracle;
         updater = _updater;
+        reserveAddress = _reserveAddress;
         // Authorized price provider 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
         priKey = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
 
@@ -53,22 +55,24 @@ contract Signer is Test {
         // (,address updater,) = vm.readCallers();
         updater = msg.sender;
         bytes32 structHash = keccak256(abi.encode(
-            _DATA_TYPEHASH, 
-            authorizedAddr,
-            updater,
-            _tab,
+            _DATA_TYPEHASH,
             _price,
             _timestamp,
+            authorizedAddr,
+            updater,
+            reserveAddress,
+            _tab,
             IPriceOracle(priceOracle).nonces(updater)
         ));
         bytes32 digest = MessageHashUtils.toTypedDataHash(_buildDomainSeparator(), structHash);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(priKey, digest);
         priceData = IPriceOracle.UpdatePriceData(
-            authorizedAddr,
-            updater,
-            _tab,
             _price,
             _timestamp,
+            authorizedAddr,
+            updater,
+            reserveAddress,
+            _tab,
             v,
             r,
             s

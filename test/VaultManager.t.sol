@@ -35,7 +35,6 @@ contract VaultManagerTest is Deployer {
         cbBTC.approve(address(vaultManager), 10e8);
         priceData = signer.getUpdatePriceSignature(usd, 100000e18, block.timestamp);
         vaultManager.createVault(
-            reserve_cbBTC, 
             1e18, 
             50000e18, 
             priceData
@@ -133,22 +132,19 @@ contract VaultManagerTest is Deployer {
     function test_createVault() public {
         vm.startPrank(eoa_accounts[0]);
         priceData = signer.getUpdatePriceSignature(usd, 100000e18, block.timestamp);
-        
-        vm.expectRevert(IVaultManager.ZeroAddress.selector);
-        vaultManager.createVault(address(0), 1e18, 50000e18, priceData);
 
         vm.expectRevert(IVaultManager.ZeroValue.selector);
-        vaultManager.createVault(reserve_cbBTC, 0, 50000e18, priceData);
+        vaultManager.createVault(0, 50000e18, priceData);
         vm.expectRevert(IVaultManager.ZeroValue.selector);
-        vaultManager.createVault(reserve_cbBTC, 1e18, 0, priceData);
+        vaultManager.createVault(1e18, 0, priceData);
 
         vm.expectRevert(abi.encodeWithSelector(IVaultManager.ExceededWithdrawable.selector, 55555555555555555555555));
-        vaultManager.createVault(reserve_cbBTC, 1e18, 55556e18, priceData);
+        vaultManager.createVault(1e18, 55556e18, priceData);
 
         TabERC20 sUSD = TabERC20(tab);
         vm.expectEmit();
         emit IVaultManager.NewVault(eoa_accounts[0], 2, reserve_cbBTC, 1e18, address(sUSD), 55555e18);
-        vaultManager.createVault(reserve_cbBTC, 1e18, 55555e18, priceData);
+        vaultManager.createVault(1e18, 55555e18, priceData);
 
         assertEq(cbBTC.balanceOf(eoa_accounts[0]), 10e8 - 1e8 - 1e8);
         assertEq(cbBTC.balanceOf(address(reserveSafe)), 1e8 + 1e8);
@@ -168,7 +164,7 @@ contract VaultManagerTest is Deployer {
         vm.startPrank(eoa_accounts[0]);
         priceData = signer.getUpdatePriceSignature(usd, _price, block.timestamp);
 
-        vaultManager.createVault(reserve_cbBTC, 1e18, _mintAmt, priceData);
+        vaultManager.createVault(1e18, _mintAmt, priceData);
 
         assertEq(cbBTC.balanceOf(eoa_accounts[0]), 10e8 - 1e8 - 1e8);
         assertEq(cbBTC.balanceOf(address(reserveSafe)), 1e8 + 1e8);
@@ -193,7 +189,7 @@ contract VaultManagerTest is Deployer {
         vm.startPrank(eoa_accounts[0]);
         priceData = signer.getUpdatePriceSignature(usd, _price, block.timestamp);
 
-        vaultManager.createVault(reserve_cbBTC, _depositAmt, _mintAmt, priceData);
+        vaultManager.createVault(_depositAmt, _mintAmt, priceData);
         
         uint256 nativeDepositAmt = reserveSafe.getNativeTransferAmount(reserve_cbBTC, _depositAmt);
         assertEq(cbBTC.balanceOf(eoa_accounts[0]), 10e8 - 1e8 - nativeDepositAmt);
@@ -214,7 +210,7 @@ contract VaultManagerTest is Deployer {
         governanceAction.disableReserve(reserve_cbBTC);
         vm.startPrank(eoa_accounts[0]);
         vm.expectRevert(abi.encodeWithSelector(IVaultManager.InvalidReserve.selector, reserve_cbBTC));
-        vaultManager.createVault(reserve_cbBTC, 1e18, 50000e18, priceData);
+        vaultManager.createVault(1e18, 50000e18, priceData);
 
         vm.expectRevert(abi.encodeWithSelector(IVaultManager.InvalidReserve.selector, reserve_cbBTC));
         vaultManager.withdrawReserve(1, 1e8, priceData);
@@ -222,6 +218,7 @@ contract VaultManagerTest is Deployer {
         vm.expectRevert(abi.encodeWithSelector(IVaultManager.InvalidReserve.selector, reserve_cbBTC));
         vaultManager.depositReserve(eoa_accounts[0], 1, 1e8);
 
+        priceData = signer.getUpdatePriceSignature(usd, 100000e18, block.timestamp);
         vaultManager.withdrawTab(1, 1e18, priceData);
 
         TabERC20 sUSD = TabERC20(tab);
@@ -232,42 +229,12 @@ contract VaultManagerTest is Deployer {
         vaultManager.chargeRiskPenalty(eoa_accounts[0], 1, 1e18);
     }
 
-    function test_ctrlAltDel() public {
-        vm.startPrank(address(governanceTimelockController));
-
-        // Fixed price fall below existing vault's reserve liquidation level
-        vm.expectRevert(abi.encodeWithSelector(IVaultManager.LiquidatingVault.selector, eoa_accounts[0], 1));
-        governanceAction.ctrlAltDel(usd, 1e18); 
-
-        governanceAction.ctrlAltDel(usd, 100000e18);
-
-        vm.startPrank(eoa_accounts[0]);
-        vm.expectRevert(abi.encodeWithSelector(IVaultManager.CtrlAltDelTab.selector, usd));
-        vaultManager.createVault(reserve_cbBTC, 1e18, 50000e18, priceData);
-
-        vm.expectRevert(abi.encodeWithSelector(IVaultManager.CtrlAltDelTab.selector, usd));
-        vaultManager.withdrawTab(1, 1e18, priceData);
-
-        vm.expectRevert(abi.encodeWithSelector(IVaultManager.InvalidVault.selector, eoa_accounts[0], 1));
-        vaultManager.paybackTab(eoa_accounts[0], 1, 1e18);
-
-        // able to withdraw reserve
-        vaultManager.withdrawReserve(1, 1e8, priceData);
-
-        // able to deposit reserve, although it shouldn't
-        vaultManager.depositReserve(eoa_accounts[0], 1, 1e8);
-
-        vm.startPrank(address(vaultKeeper));
-        vm.expectRevert(abi.encodeWithSelector(IVaultManager.InvalidVault.selector, eoa_accounts[0], 1));
-        vaultManager.chargeRiskPenalty(eoa_accounts[0], 1, 1e18);
-    }
-
     function test_frozenTab() public {
         vm.startPrank(address(governanceTimelockController));
         governanceAction.disableTab(usd);
         vm.startPrank(eoa_accounts[0]);
         vm.expectRevert(abi.encodeWithSelector(IVaultManager.DisabledTab.selector, usd));
-        vaultManager.createVault(reserve_cbBTC, 1e18, 50000e18, priceData);
+        vaultManager.createVault(1e18, 50000e18, priceData);
 
         vm.expectRevert(abi.encodeWithSelector(IVaultManager.DisabledTab.selector, usd));
         vaultManager.withdrawTab(1, 1e18, priceData);

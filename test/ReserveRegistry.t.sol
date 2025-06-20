@@ -116,7 +116,7 @@ contract ReserveRegistryTest is Deployer {
         bytes3 sUSD = bytes3(abi.encodePacked("USD"));
         cbBTC.approve(address(vaultManager), 2e8);
         priceData = signer.getUpdatePriceSignature(sUSD, 60000e18, block.timestamp); 
-        vaultManager.createVault(address(cbBTC), 1e18, 10000e18, priceData);
+        vaultManager.createVault(1e18, 10000e18, priceData);
 
         vm.startPrank(address(governanceTimelockController));
 
@@ -142,7 +142,7 @@ contract ReserveRegistryTest is Deployer {
         // failed to make trx with cbBTC, the reserve token is disabled
         priceData = signer.getUpdatePriceSignature(sUSD, 60000e18, block.timestamp); 
         vm.expectRevert(abi.encodeWithSelector(IVaultManager.InvalidReserve.selector, address(cbBTC)));
-        vaultManager.createVault(address(cbBTC), 1e18, 10000e18, priceData);
+        vaultManager.createVault(1e18, 10000e18, priceData);
 
         vm.expectRevert(abi.encodeWithSelector(IVaultManager.InvalidReserve.selector, address(cbBTC)));
         vaultManager.withdrawReserve(1, 1e6, priceData);

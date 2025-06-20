@@ -22,7 +22,6 @@ import {ReserveSafe} from "../contracts/reserve/ReserveSafe.sol";
 import {ReserveRegistry} from "../contracts/reserve/ReserveRegistry.sol";
 import {AuctionManager} from "../contracts/core/AuctionManager.sol";
 import {Config} from "../contracts/core/Config.sol";
-import {ProtocolVault} from "../contracts/core/ProtocolVault.sol";
 import {TabRegistry} from "../contracts/core/TabRegistry.sol";
 import {VaultKeeper} from "../contracts/core/VaultKeeper.sol";
 import {VaultManager} from "../contracts/core/VaultManager.sol";
@@ -98,7 +97,6 @@ contract DeployMainnet is Script {
     VaultKeeper vaultKeeper;
     AuctionManager auctionManager;
     VaultUtils vaultUtils;
-    ProtocolVault protocolVault;
 
     function run() external {
         vm.startBroadcast(owner);
@@ -317,32 +315,6 @@ contract DeployMainnet is Script {
         );
 
         config.setVaultKeeperAddress(vaultKeeperAddr);
-
-        // ProtocolVault
-        if (block.chainid == 84532) { // Deploy if it is running for testnet
-            bytes memory protocolVaultInitData = abi.encodeWithSignature(
-                "initialize(address,address,address,address)",
-                governance,                 // Governance controller
-                address(tabProxyAdmin),     // upgrader
-                vaultManagerAddr,           // Vault manager
-                address(reserveSafe)
-            );
-            ProtocolVault protocolVaultImpl = new ProtocolVault(); // implementation
-            console.log("protocolVaultImpl: ", address(protocolVaultImpl));
-            address protocolVaultAddr = address(
-                new TransparentUpgradeableProxy(
-                    address(protocolVaultImpl), address(tabProxyAdmin), protocolVaultInitData
-                )
-            );
-            protocolVault = ProtocolVault(protocolVaultAddr);
-            // Todo (before executing ctrlAltDel operation): 
-            // Revoke MINTER_ROLE from VaultManager on targeted tab.
-            // Grant MINTER_ROLE to ProtocolVault on targeted tab.
-
-            tabRegistry.setProtocolVaultAddress(protocolVaultAddr);
-
-            console.log("protocolVault: ", address(protocolVault));
-        }
 
         // Default 3 oracle providers
         // Assume 5-min feed interval and 2s block gen. time,

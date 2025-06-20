@@ -45,7 +45,7 @@ contract AuctionManagerTest is Deployer {
         vm.startPrank(address(governanceTimelockController));
         vaultKeeper.setRiskPenaltyFrameInSecond(10);
         governanceAction.createNewTab(usd);
-        priceOracle.setDirectPrice(usd, 20000e18, block.timestamp); // drop to BTC/USD 10799.99 later
+        priceOracle.setDirectPrice(strReserve, usd, 20000e18, block.timestamp); // drop to BTC/USD 10799.99 later
         vm.stopPrank();
 
         vm.startPrank(deployer);
@@ -56,10 +56,10 @@ contract AuctionManagerTest is Deployer {
 
         vm.startPrank(eoa_accounts[0]);
         cbBTC.approve(address(vaultManager), 6e8);
-        vaultManager.createVault(reserve_cbBTC, 6e18, 54000e18, signer.getUpdatePriceSignature(usd, 20000e18, block.timestamp));
+        vaultManager.createVault(6e18, 54000e18, signer.getUpdatePriceSignature(usd, 20000e18, block.timestamp));
         assertEq(vaultId, 1);
         (tabCode, reserveAddr, price, reserveAmt, osTab, reserveValue, minReserveValue) =
-            vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, priceOracle.getPrice(usd));
+            vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, priceOracle.getPrice(pricePairKeyUSD));
         assertEq(reserveAddr, address(cbBTC));
         assertEq(price, 20000e18);
         assertEq(reserveAmt, 6e18);
@@ -70,7 +70,7 @@ contract AuctionManagerTest is Deployer {
         // create another vault to get sUSD for bidding
         vm.startPrank(eoa_accounts[9]);
         cbBTC.approve(address(vaultManager), 10e8);
-        vaultManager.createVault(reserve_cbBTC, 10e18, 60000e18, signer.getUpdatePriceSignature(usd, 20000e18, block.timestamp));
+        vaultManager.createVault(10e18, 60000e18, signer.getUpdatePriceSignature(usd, 20000e18, block.timestamp));
         
         // price dropped and keeper's checkVault triggered liquidation
         tab = tabRegistry.getTabAddress(usd);
@@ -319,7 +319,7 @@ contract AuctionManagerTest is Deployer {
         vm.stopPrank();
 
         (tabCode, reserveAddr, price, reserveAmt, osTab, reserveValue, minReserveValue) =
-            vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, priceOracle.getPrice(usd));
+            vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, priceOracle.getPrice(pricePairKeyUSD));
         assertEq(reserveAmt, 0);
         assertEq(osTab, 0);
         assertEq(reserveValue, 0);
@@ -441,7 +441,7 @@ contract AuctionManagerTest is Deployer {
         assertEq(auctionState.auctionPrice, 0);
 
         (tabCode, reserveAddr, price, reserveAmt, osTab, reserveValue, minReserveValue) =
-            vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, priceOracle.getPrice(usd));
+            vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, priceOracle.getPrice(pricePairKeyUSD));
         assertEq(reserveAddr, address(cbBTC));
         assertEq(price, 1079999e16);
         assertEq(reserveAmt, 0);
@@ -522,7 +522,7 @@ contract AuctionManagerTest is Deployer {
         assertEq(auctionState.auctionPrice, 0);
 
         (tabCode, reserveAddr, price, reserveAmt, osTab, reserveValue, minReserveValue) =
-            vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, priceOracle.getPrice(usd));
+            vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, priceOracle.getPrice(pricePairKeyUSD));
         assertEq(reserveAddr, address(cbBTC));
         assertEq(price, 1079999e16);
         assertEq(reserveAmt, expectedLeftoverReserve);
@@ -552,14 +552,14 @@ contract AuctionManagerTest is Deployer {
         vm.startPrank(address(governanceTimelockController));
         governanceAction.updateAuctionParams(90, 95, auctionStepDurationInSec, address(auctionManager));
         nextBlock(10);
-        priceOracle.setDirectPrice(usd, startPrice, block.timestamp);
+        priceOracle.setDirectPrice(strReserve, usd, startPrice, block.timestamp);
         
         vm.startPrank(eoa_accounts[9]);
         priceData = signer.getUpdatePriceSignature(usd, startPrice, block.timestamp);
 
         vaultId = 2;
         (tabCode, reserveAddr, price, reserveAmt, osTab, reserveValue, minReserveValue) =
-            vaultUtils.getVaultDetails(eoa_accounts[9], vaultId, priceOracle.getPrice(usd));
+            vaultUtils.getVaultDetails(eoa_accounts[9], vaultId, priceOracle.getPrice(pricePairKeyUSD));
         
         vm.startPrank(address(governanceTimelockController));
         IVaultKeeper.VaultDetails memory vd = IVaultKeeper.VaultDetails(
