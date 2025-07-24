@@ -140,5 +140,6 @@ broadcast/
 .gas-snapshot
 script/localnet/
 test/utils/RateSimulator.sol
+test/fork/*
 contracts/governance/ShiftCtrlGovernor.sol
 contracts/governance/ShiftCtrlEmergencyGovernor.sol

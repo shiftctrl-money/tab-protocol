@@ -53,7 +53,7 @@ import {VaultUtils} from "../contracts/utils/VaultUtils.sol";
     priceOracleManagerImpl:  0xA850B25e6489e8259CAFFD9571d6dE6fE842C8cf
     priceOracleManager:  0xBdFd9503f62A23092504eD072158092B6B3342ac
     priceOracle:  0x7a65f5f7b2ba2F15468688c8e98835A3f9be2520
-    vaultKeeperImpl:  0x7a50Da5330b6fc3838Ef6EA757458a7601231aA8
+    vaultKeeperImpl:  0x936983Fb90E38cB572a543ed400cf4C7480AA6d6 (replaced 0x7a50Da5330b6fc3838Ef6EA757458a7601231aA8)
     vaultKeeper:  0x303818F385f1675BBB07dDE155987f6b7041753c
     protocolVaultImpl:  0xE332Fc0D65a0aDAd9eD7cf5964D5223cF0a25bC3
     protocolVault:  0xBC6bef5A3a1211B033322F3730e8DFf2f81AcA84

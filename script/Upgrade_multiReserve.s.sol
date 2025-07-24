@@ -11,6 +11,7 @@ import {PriceOracle} from "../contracts/oracle/PriceOracle.sol";
 import {PriceOracleManager} from "../contracts/oracle/PriceOracleManager.sol";
 import {ReserveRegistry} from "../contracts/reserve/ReserveRegistry.sol";
 import {VaultManager} from "../contracts/core/VaultManager.sol";
+import {VaultKeeper} from "../contracts/core/VaultKeeper.sol";
 import {ITransparentUpgradeableProxy} 
     from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -24,12 +25,16 @@ import {ITransparentUpgradeableProxy}
   priceOracle:  0x61AC8eaf1880a9E85Af3C34c0d62588eACD1CB76
   vaultManager(impl):  0x9F362f149B161B1b8Df3bF02a8ef94E2168A1f50
   Proposal created with ID:  46361081338096919900597981395997329650918010701155622056562850297782656932225
+  vaultKeeper(impl):  0x936983Fb90E38cB572a543ed400cf4C7480AA6d6 (Fix: need to update VaultKeeper contract to support new IPriceOracle.UpdatePriceData)
+  Proposal created with ID:  90931280054195664636327690276643910292875452763724133040668237478315402886277
+  Proposal created with ID:  73521417347125667422111165627222447371593945988817451004527871650553594917391 (multiReserves: update vault keeper(07/07))
 
  * Mainnet:
   Upgrade is started on chain id 8453 BASE mainnet...
   priceOracle:  0x0eB8De03B9398Ac043218BAFd6Fce15950fAA8Cf
   vaultManager(impl):  0x908AaB3701eb069366C17Eb9a58cbaFDBAAAcabb
-  Proposal created with ID:  79189382921291531791938112866080452889452389687662959478184891151960607611580 
+  vaultKeeper(impl):  0x0c192c7156644504335C828Dd73292Cf413F0B80
+  Proposal created with ID:  41101243386788499495958610878484343518028116860490921723591377402074313003923
   
  */
 contract Upgrade_multiReserve is Script {
@@ -40,6 +45,7 @@ contract Upgrade_multiReserve is Script {
     PriceOracleManager priceOracleManager;
     ReserveRegistry reserveRegistry;
     VaultManager vaultManager;
+    VaultKeeper vaultKeeper;
     ProxyAdmin tabProxyAdmin;
     CTRL ctrl;
 
@@ -53,7 +59,7 @@ contract Upgrade_multiReserve is Script {
     address reserveRegistryAddr;
     address tabProxyAdminAddr;
     address config;
-    address vaultKeeper;
+    address vaultKeeperAddr;
 
     function run() external {
         if (block.chainid == 8453)
@@ -76,7 +82,7 @@ contract Upgrade_multiReserve is Script {
             reserveRegistryAddr = 0xb59B6ba5426255B669C3966261aC4b2D59A76943;
             tabProxyAdminAddr = 0x65FB1EF0f9C15b2653421D9008fd7E55889890E2;
             config = 0xC81455d98AD16db5043c775bD1eCd2677E39e670;
-            vaultKeeper = 0xBbFD14d040b7E3b3cC3eef52DCB1E84Cb3E397C5;
+            vaultKeeperAddr = 0xBbFD14d040b7E3b3cC3eef52DCB1E84Cb3E397C5;
 
             // ctrl.mint(owner, 10000e18); // 10K to propose
             // ctrl.delegate(owner);
@@ -94,7 +100,7 @@ contract Upgrade_multiReserve is Script {
             reserveRegistryAddr = 0xDA8A64cDFaeb08b3f28b072b0d4aC371953F5B6E;
             tabProxyAdminAddr = 0xF44013D4BE0F452938B0b805Bc5Bf0D3Fbd4102c;
             config = 0x25B9982A32106EeB2Aa052319011De58A7d33457;
-            vaultKeeper = 0x303818F385f1675BBB07dDE155987f6b7041753c;
+            vaultKeeperAddr = 0x303818F385f1675BBB07dDE155987f6b7041753c;
 
             // ctrl.delegate(owner);
         }
@@ -112,15 +118,17 @@ contract Upgrade_multiReserve is Script {
         console.log("priceOracle: ", address(priceOracle));
 
         tabProxyAdmin = ProxyAdmin(tabProxyAdminAddr);
-        address[] memory targets = new address[](2);
+        address[] memory targets = new address[](3);
         targets[0] = tabProxyAdminAddr;
         targets[1] = vaultManagerAddr;
+        targets[2] = tabProxyAdminAddr;
 
-        uint256[] memory values = new uint256[](2);
+        uint256[] memory values = new uint256[](3);
         values[0] = 0;
         values[1] = 0;
+        values[2] = 0;
         
-        bytes[] memory calldatas = new bytes[](2);
+        bytes[] memory calldatas = new bytes[](3);
         // Propose #1: Upgrade VaultManager contract
         vaultManager = new VaultManager();
         console.log("vaultManager(impl): ", address(vaultManager));
@@ -137,8 +145,36 @@ contract Upgrade_multiReserve is Script {
             reserveRegistryAddr,
             tabRegistry,
             address(priceOracle),
-            vaultKeeper
+            vaultKeeperAddr
         );
+        // Propose #3: Upgrade VaultKeeper contract - reference on updated IPriceOracle.UpdatePriceData
+        vaultKeeper = new VaultKeeper();
+        console.log("vaultKeeper(impl): ", address(vaultKeeper));
+        calldatas[2] = abi.encodeWithSelector(
+            tabProxyAdmin.upgradeAndCall.selector, 
+            ITransparentUpgradeableProxy(vaultKeeperAddr), 
+            address(vaultKeeper),
+            bytes("")
+        );
+
+/*        
+        tabProxyAdmin = ProxyAdmin(tabProxyAdminAddr);
+        address[] memory targets = new address[](1);
+        targets[0] = tabProxyAdminAddr;
+
+        uint256[] memory values = new uint256[](1);
+        values[0] = 0;
+
+        bytes[] memory calldatas = new bytes[](1);
+        // vaultKeeper = new VaultKeeper();
+        // console.log("vaultKeeper(impl): ", address(vaultKeeper));
+        calldatas[0] = abi.encodeWithSelector(
+            tabProxyAdmin.upgradeAndCall.selector, 
+            ITransparentUpgradeableProxy(vaultKeeperAddr), 
+            0x936983Fb90E38cB572a543ed400cf4C7480AA6d6, //address(vaultKeeper),
+            bytes("")
+        );
+*/
 
         // Voting delay = 2 days, Voting period = 3 days, Proposal threshold = 10000
         // Quorum = 5%, 2 days timelock delay
@@ -147,7 +183,7 @@ contract Upgrade_multiReserve is Script {
             values, 
             calldatas, 
             "multiReserves: update vault manager and price oracle"
-        );
+        ); //               update vault keeper(07/07)
         console.log("Proposal created with ID: ", proposalId);
 
         console.log("Upgrade is completed.");

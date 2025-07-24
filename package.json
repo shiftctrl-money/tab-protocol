@@ -17,10 +17,10 @@
   "license": "MIT",
   "devDependencies": {
     "@openzeppelin/contracts": "^5.1.0",
-    "@openzeppelin/contracts-upgradeable": "^5.1.0",
-    "ethers": "^6.13.4"
+    "@openzeppelin/contracts-upgradeable": "^5.1.0"
   },
   "dependencies": {
+    "@layerzerolabs/oft-evm": "^3.1.4",
     "forge-std": "github:foundry-rs/forge-std#v1.9.4"
   },
   "bugs": {
