@@ -72,6 +72,7 @@ contract TabRegistry is ITabRegistry, AccessControlDefaultAdminRules {
         _grantRole(USER_ROLE, _admin);
         _grantRole(USER_ROLE, _admin2);
         _grantRole(USER_ROLE, _governanceAction);
+        _grantRole(USER_ROLE, _deployer);
         _grantRole(USER_ROLE, _vaultManager);
 
         // Can maintain associated protocol contract addresses
@@ -210,6 +211,25 @@ contract TabRegistry is ITabRegistry, AccessControlDefaultAdminRules {
     }
 
     /**
+     * @dev Load Tab contract address from TabFactory.
+     */
+    function loadTabs() external onlyRole(MAINTAINER_ROLE) {
+        uint256 tabCount = ITabFactory(tabFactory).getTabListLength();
+        for (uint256 i; i < tabCount; i++) {
+            bytes3 tab = ITabFactory(tabFactory).tabList(i);
+            bytes32 tabKey = tabCodeToTabKey(tab);
+            if (tabs[tabKey] == address(0)) { // save into registry only if not already registered
+                address tabAddress = ITabFactory(tabFactory).tabs(tabKey);
+                tabs[tabKey] = tabAddress;
+                tabList.push(tab);
+                activatedTabCount += 1;
+                IConfig(config).setDefTabParams(tab);
+                emit TabRegistryAdded(_addTabCodePrefix(tab), tabAddress);
+            }
+        }
+    }
+
+    /**
      * @dev Register and create new Tab.
      * @param _tab Tab code in bytes3.
      */
@@ -221,7 +241,7 @@ contract TabRegistry is ITabRegistry, AccessControlDefaultAdminRules {
         string memory _symbol = _addTabCodePrefix(_tab);
         string memory _name = string(abi.encodePacked("Sound ", _tab));
         address createdAddr =
-            ITabFactory(tabFactory).createTab(defaultAdmin(), vaultManager, _name, _symbol);
+            ITabFactory(tabFactory).createTab(defaultAdmin(), vaultManager, _name, _symbol, _tab);
         tabs[tabKey] = createdAddr;
         tabList.push(_tab); // list of bytes3
         activatedTabCount = activatedTabCount + 1;

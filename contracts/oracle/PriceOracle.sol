@@ -8,6 +8,7 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IPriceOracle} from "../interfaces/IPriceOracle.sol";
+import {IPriceData} from "../interfaces/IUniTabOperation.sol";
 
 /**
  * @title Contract to store BTC to Tab rates.
@@ -25,7 +26,7 @@ contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdmi
 
     // EIP712
     mapping(address => uint256) public nonces;
-    bytes32 private constant _DATA_TYPEHASH = keccak256("UpdatePriceData(address owner,address updater,bytes3 tab,uint256 price,uint256 timestamp,uint256 nonce)");
+    bytes32 private constant _DATA_TYPEHASH = keccak256("UpdatePriceData(address signer,address updater,uint256 chainID,bytes3 tab,uint256 price,uint256 timestamp,uint256 nonce)");
 
     // Maintain in PriceOracleManager
     uint256 public inactivePeriod; // allowed lastUpdated inactive for X seconds
@@ -183,7 +184,7 @@ contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdmi
      * @param priceData Signed Tab rate by authorized oracle service.
      */
     function updatePrice(
-        UpdatePriceData calldata priceData
+        IPriceData.UpdatePriceData calldata priceData
     ) 
         external 
         onlyRole(FEEDER_ROLE) 
@@ -194,14 +195,64 @@ contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdmi
         // not applicable on ctrl-alt-del tab, returns its fixed rate
         if (ctrlAltDelTab[priceData.tab] > 0)
             return _getPrice(priceData.tab);
+
+        if (!validPriceData(priceData))
+            return _getPrice(priceData.tab);
         
+        nonces[priceData.updater] += 1;
+
+        // Regular (non-pegged) tab
+        if (peggedTabMap[priceData.tab] == 0x0) {
+            if (priceData.price == prices[priceData.tab]) {
+                lastUpdated[priceData.tab] = priceData.timestamp;
+                return priceData.price;
+            } else {
+                emit UpdatedPrice(
+                    priceData.tab, 
+                    prices[priceData.tab], 
+                    priceData.price, 
+                    priceData.timestamp
+                );
+                prices[priceData.tab] = priceData.price;
+                lastUpdated[priceData.tab] = priceData.timestamp;
+                
+                return priceData.price;
+            }
+        } else { // Pegged tab existed, 
+            // i.e. when PEG pegged to USD, calc. & update USD rate based on supplied PEG
+            bytes3 peggedTab = peggedTabMap[priceData.tab];
+            uint256 peggedTabRate = Math.mulDiv(
+                priceData.price, 
+                100, 
+                peggedTabPriceRatio[priceData.tab]
+            );
+            if (peggedTabRate == prices[peggedTab])
+                return priceData.price;
+            else {
+                emit UpdatedPrice(
+                    peggedTab, 
+                    prices[peggedTab], 
+                    peggedTabRate, 
+                    priceData.timestamp
+                );
+                prices[peggedTab] = peggedTabRate;
+                lastUpdated[peggedTab] = priceData.timestamp;
+                
+                return priceData.price;
+            }
+        }
+       
+    }
+
+    function validPriceData(IPriceData.UpdatePriceData calldata priceData) public view returns(bool) {
         if (priceData.timestamp > lastUpdated[priceData.tab]) { 
             if (priceData.price == 0)
                 revert ZeroPrice();
             bytes32 structHash = keccak256(abi.encode(
                 _DATA_TYPEHASH, 
-                priceData.owner,
+                priceData.signer,
                 priceData.updater,
+                priceData.chainID,
                 priceData.tab,
                 priceData.price,
                 priceData.timestamp,
@@ -214,7 +265,7 @@ contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdmi
                 priceData.r, 
                 priceData.s
             );
-            if (signer != priceData.owner)
+            if (signer != priceData.signer)
                 revert InvalidSignature();
         
             if (!hasRole(SIGNER_ROLE, signer))
@@ -222,51 +273,10 @@ contract PriceOracle is IPriceOracle, Pausable, EIP712, AccessControlDefaultAdmi
 
             if (block.timestamp > (priceData.timestamp + inactivePeriod))
                 revert ExpiredRate(block.timestamp, priceData.timestamp, inactivePeriod);
-            
-            nonces[priceData.updater] += 1;
 
-            // Regular (non-pegged) tab
-            if (peggedTabMap[priceData.tab] == 0x0) {
-                if (priceData.price == prices[priceData.tab]) {
-                    lastUpdated[priceData.tab] = priceData.timestamp;
-                    return priceData.price;
-                } else {
-                    emit UpdatedPrice(
-                        priceData.tab, 
-                        prices[priceData.tab], 
-                        priceData.price, 
-                        priceData.timestamp
-                    );
-                    prices[priceData.tab] = priceData.price;
-                    lastUpdated[priceData.tab] = priceData.timestamp;
-                    
-                    return priceData.price;
-                }
-            } else { // Pegged tab existed, 
-                // i.e. when PEG pegged to USD, calc. & update USD rate based on supplied PEG
-                bytes3 peggedTab = peggedTabMap[priceData.tab];
-                uint256 peggedTabRate = Math.mulDiv(
-                    priceData.price, 
-                    100, 
-                    peggedTabPriceRatio[priceData.tab]
-                );
-                if (peggedTabRate == prices[peggedTab])
-                    return priceData.price;
-                else {
-                    emit UpdatedPrice(
-                        peggedTab, 
-                        prices[peggedTab], 
-                        peggedTabRate, 
-                        priceData.timestamp
-                    );
-                    prices[peggedTab] = peggedTabRate;
-                    lastUpdated[peggedTab] = priceData.timestamp;
-                    
-                    return priceData.price;
-                }
-            }
+            return true;
         } else {
-            return _getPrice(priceData.tab);
+            return false;
         }
     }
 

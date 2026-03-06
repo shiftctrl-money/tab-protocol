@@ -7,7 +7,7 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IConfig} from "../interfaces/IConfig.sol";
-import {IPriceOracle} from "../interfaces/IPriceOracle.sol";
+import {IPriceData} from "../interfaces/IUniTabOperation.sol";
 import {IVaultManager} from "../interfaces/IVaultManager.sol";
 import {IVaultKeeper} from "../interfaces/IVaultKeeper.sol";
 
@@ -162,7 +162,7 @@ contract VaultKeeper is Initializable, AccessControlDefaultAdminRulesUpgradeable
     function checkVault(
         uint256 _timestamp, 
         VaultDetails calldata v, 
-        IPriceOracle.UpdatePriceData calldata sigPrice
+        IPriceData.UpdatePriceData calldata sigPrice
     ) 
         external 
         onlyRole(EXECUTOR_ROLE) 
@@ -172,7 +172,7 @@ contract VaultKeeper is Initializable, AccessControlDefaultAdminRulesUpgradeable
         if (v.reserveValue >= v.minReserveValue)
             revert NoDeltaValue();
 
-        bool clearedRP = _pushAllVaultRiskPenalty(_timestamp, v.vaultId);
+        bool clearedRp = _pushAllVaultRiskPenalty(_timestamp, v.vaultId);
 
         if (checkedTimestamp == 0) {
             checkedTimestamp = _timestamp;
@@ -183,8 +183,8 @@ contract VaultKeeper is Initializable, AccessControlDefaultAdminRulesUpgradeable
         bytes32 tabKey = tabCodeToTabKey(v.tab);
 
         // current vault has been charged risk penalty from previous frame, recalc os tab
-        if (clearedRP) {
-            osTab += chargedMap[v.vaultId].chargedRP;
+        if (clearedRp) {
+            osTab += chargedMap[v.vaultId].chargedRp;
             minReserveValue = Math.mulDiv(osTab, tabParams[tabKey].minReserveRatio, 100);
         }
         uint256 reserveDelta = minReserveValue - v.reserveValue;
@@ -235,10 +235,10 @@ contract VaultKeeper is Initializable, AccessControlDefaultAdminRulesUpgradeable
                 riskPenaltyCharge.owner,
                 riskPenaltyCharge.vaultId,
                 riskPenaltyCharge.delta,
-                riskPenaltyCharge.chargedRP
+                riskPenaltyCharge.chargedRp
             );
             IVaultManager(vaultManager).chargeRiskPenalty(
-                riskPenaltyCharge.owner, riskPenaltyCharge.vaultId, riskPenaltyCharge.chargedRP
+                riskPenaltyCharge.owner, riskPenaltyCharge.vaultId, riskPenaltyCharge.chargedRp
             );
 
             vaultMap[vaultIdList[vaultIdList.length - 1]].listIndex = vd.listIndex; // update map index of last item
@@ -255,13 +255,13 @@ contract VaultKeeper is Initializable, AccessControlDefaultAdminRulesUpgradeable
     function isLiquidatingVault(
         bytes3 _tab,
         uint256 _totalReserve,
-        uint256 _totalOS
+        uint256 _totalOs
     )
         external
         view
         returns (bool)
     {
-        return calcReserveRatio(_totalReserve, _totalOS) < (tabParams[tabCodeToTabKey(_tab)].liquidationRatio * 100);
+        return calcReserveRatio(_totalReserve, _totalOs) < (tabParams[tabCodeToTabKey(_tab)].liquidationRatio * 100);
     }
 
     function getVaultMap(
@@ -288,7 +288,7 @@ contract VaultKeeper is Initializable, AccessControlDefaultAdminRulesUpgradeable
         return keccak256(abi.encodePacked(code));
     }
 
-    function _pushAllVaultRiskPenalty(uint256 _timestamp, uint256 _vaultId) internal returns (bool clearedRP) {
+    function _pushAllVaultRiskPenalty(uint256 _timestamp, uint256 _vaultId) internal returns (bool clearedRp) {
         if (_timestamp < checkedTimestamp)
             revert OutdatedTimestamp();
 
@@ -314,7 +314,7 @@ contract VaultKeeper is Initializable, AccessControlDefaultAdminRulesUpgradeable
                     chargedMap[vaultId] = riskPenaltyCharge;
                     largestVaultDelta[vd.vaultOwner][vaultId] = 0;
                     if (_vaultId == vaultId) {
-                        clearedRP = true;
+                        clearedRp = true;
                     }
 
                     emit RiskPenaltyCharged(
@@ -322,10 +322,10 @@ contract VaultKeeper is Initializable, AccessControlDefaultAdminRulesUpgradeable
                         riskPenaltyCharge.owner,
                         riskPenaltyCharge.vaultId,
                         riskPenaltyCharge.delta,
-                        riskPenaltyCharge.chargedRP
+                        riskPenaltyCharge.chargedRp
                     );
                     IVaultManager(vaultManager).chargeRiskPenalty(
-                        riskPenaltyCharge.owner, riskPenaltyCharge.vaultId, riskPenaltyCharge.chargedRP
+                        riskPenaltyCharge.owner, riskPenaltyCharge.vaultId, riskPenaltyCharge.chargedRp
                     );
                 }
 

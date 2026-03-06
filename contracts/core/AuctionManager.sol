@@ -138,12 +138,10 @@ contract AuctionManager is AccessControlDefaultAdminRules, ReentrancyGuard, IAuc
     }
 
     /**
-     * @dev User pays Tabs to bid on discounted BTC.
+     * @dev User specifies BTC quantity to receive and pay calculated Tab amount.
      * Required allowance to spend Tabs. 
      * @param auctionId Unique auction ID.
-     * @param bidQty BTC Bid Quantity. 
-     * If `bidQty` exceeds available BTC quantity, 
-     * set to available BTC quantity.
+     * @param bidQty BTC Bid Quantity. Set to available BTC quantity if `bidQty` exceeds available BTC quantity.
      */
     function bid(uint256 auctionId, uint256 bidQty) external nonReentrant {
         AuctionState storage state = auctionState[auctionId];
@@ -189,13 +187,101 @@ contract AuctionManager is AccessControlDefaultAdminRules, ReentrancyGuard, IAuc
         }  
 
         // transfer reserve BTC to bidder - convert from 18 to 8 decimals
-        uint256 paidBTC = IReserveSafe(reserveSafe).getNativeTransferAmount(det.reserve, bidQty);
-        SafeERC20.safeTransfer(IERC20(det.reserve), msg.sender, paidBTC);
-        emit SuccessfulBid(auctionId, msg.sender, auctionStep.stepPrice, bidQty, paidBTC);
+        uint256 paidBtc = IReserveSafe(reserveSafe).getNativeTransferAmount(det.reserve, bidQty);
+        SafeERC20.safeTransfer(IERC20(det.reserve), msg.sender, paidBtc);
+        emit SuccessfulBid(auctionId, msg.sender, auctionStep.stepPrice, bidQty, paidBtc);
 
         // update Vault
         SafeERC20.safeIncreaseAllowance(IERC20(det.tab), vaultManagerAddr, bidTabAmt);
         IVaultManager(vaultManagerAddr).paybackTab(address(this), auctionId, bidTabAmt);
+
+        // auction is completed with leftover reserve, transfer back to Vault
+        if (state.reserveQty > 0 && state.auctionAvailableQty == 0 && state.osTabAmt == 0) {
+            SafeERC20.safeIncreaseAllowance(
+                IERC20(det.reserve), 
+                vaultManagerAddr, 
+                IReserveSafe(reserveSafe).getNativeTransferAmount(det.reserve, state.reserveQty)
+            );
+            IVaultManager(vaultManagerAddr).depositReserve(address(this), auctionId, state.reserveQty);
+        }
+    }
+
+    /**
+     * @dev User specifies Tab amount to spend and receive BTC based on current auction price.
+     *      Required allowance to spend Tabs.
+     * @param auctionId Unique auction ID.
+     * @param tabToken Tab token address to spend.
+     * @param tabAmt Tab amount to spend. Excess Tab amount will be returned to bidder.
+     * @param bidder Bidder address.
+     * @param receiver Receiver address to receive BTC.
+     */
+    function bidWithTab(
+        uint256 auctionId, 
+        address tabToken,
+        uint256 tabAmt,
+        address bidder,
+        address receiver
+    ) 
+        external 
+        nonReentrant
+    {
+        AuctionState storage state = auctionState[auctionId];
+        AuctionDetails storage det = auctionDetails[auctionId];
+        if (state.auctionAvailableQty == 0)
+            revert InvalidAuction();
+        if (tabToken == address(0) || tabAmt == 0)
+            revert ZeroValue();
+        if (det.tab != tabToken)
+            revert UnmatchedTab(det.tab, tabToken);
+        uint256 excessTabAmt;
+        if (tabAmt > state.osTabAmt) {
+            excessTabAmt = tabAmt - state.osTabAmt; // excess bidding tab amount will be returned to bidder
+        }
+
+        // determine current auction step price
+        (AuctionStep memory auctionStep,) = getAuctionPrice(auctionId, block.timestamp);
+        if (auctionStep.stepPrice == 0)
+            revert ZeroStepPrice();
+
+        uint256 auctionAvailableQty = Math.mulDiv(state.osTabAmt, 1e18, auctionStep.stepPrice);
+        uint256 bidQty;
+
+        // required allowance from bidder, get Tab from bidder
+        if (excessTabAmt > 0) {
+            SafeERC20.safeTransferFrom(IERC20(det.tab), msg.sender, address(this), tabAmt);
+            IERC20(det.tab).transfer(bidder, excessTabAmt); // refund excess Tab
+            bidQty = auctionAvailableQty;
+
+            // update Vault
+            SafeERC20.safeIncreaseAllowance(IERC20(det.tab), vaultManagerAddr, state.osTabAmt);
+            IVaultManager(vaultManagerAddr).paybackTab(address(this), auctionId, state.osTabAmt);
+        } else {
+            SafeERC20.safeTransferFrom(IERC20(det.tab), msg.sender, address(this), tabAmt);
+            bidQty = Math.mulDiv(tabAmt, 1e18, auctionStep.stepPrice);
+
+            // update Vault
+            SafeERC20.safeIncreaseAllowance(IERC20(det.tab), vaultManagerAddr, tabAmt);
+            IVaultManager(vaultManagerAddr).paybackTab(address(this), auctionId, tabAmt);
+        }
+
+        // save bid details
+        auctionBid[auctionId].push(AuctionBid(bidder, block.timestamp, auctionStep.stepPrice, bidQty));
+
+        // update auction state
+        state.reserveQty = state.reserveQty - bidQty;
+        state.osTabAmt = (bidQty == auctionAvailableQty) ? 0 : (state.osTabAmt - tabAmt);
+        state.auctionAvailableQty = Math.mulDiv(state.osTabAmt, 1e18, auctionStep.stepPrice);
+        state.auctionPrice = auctionStep.stepPrice;
+
+        if (state.osTabAmt > 0) {
+            (, uint256 lastStepTimestamp) = getAuctionPrice(auctionId, block.timestamp);
+            det.lastStepTimestamp = lastStepTimestamp;
+        }  
+
+        // transfer reserve BTC to bidder - convert from 18 to 8 decimals
+        uint256 paidBtc = IReserveSafe(reserveSafe).getNativeTransferAmount(det.reserve, bidQty);
+        SafeERC20.safeTransfer(IERC20(det.reserve), receiver, paidBtc);
+        emit SuccessfulBid(auctionId, bidder, auctionStep.stepPrice, bidQty, paidBtc);
 
         // auction is completed with leftover reserve, transfer back to Vault
         if (state.reserveQty > 0 && state.auctionAvailableQty == 0 && state.osTabAmt == 0) {

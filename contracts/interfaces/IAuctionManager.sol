@@ -59,6 +59,15 @@ interface IAuctionManager {
 
     function bid(uint256 auctionId, uint256 bidQty) external;
 
+    function bidWithTab(
+        uint256 auctionId, 
+        address tabToken,
+        uint256 tabAmt,
+        address bidder,
+        address receiver
+    ) 
+        external;
+
     function getAuctionState(
         uint256 auctionId
     ) 
@@ -106,6 +115,7 @@ interface IAuctionManager {
 
     error ZeroAddress();
     error ZeroValue();
+    error UnmatchedTab(address requiredTab, address givenTab);
     error InvalidAuction();
     error ZeroStepPrice();
     error ExistedAuction();

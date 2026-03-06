@@ -2,9 +2,7 @@
 pragma solidity 0.8.28;
 
 import {console} from "forge-std/console.sol";
-import {Deployer} from "./Deployer.t.sol";
-import {ITransparentUpgradeableProxy} 
-    from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {UniDeployer} from "./UniDeployer.t.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {TabERC20} from "../contracts/token/TabERC20.sol";
 import {VaultKeeper_newImpl} from "./upgrade/VaultKeeper_newImpl.sol";
@@ -12,7 +10,7 @@ import {IVaultKeeper} from "../contracts/interfaces/IVaultKeeper.sol";
 import {IVaultManager} from "../contracts/interfaces/IVaultManager.sol";
 import {IConfig} from "../contracts/interfaces/IConfig.sol";
 
-contract VaultKeeperTest is Deployer {
+contract VaultKeeperTest is UniDeployer {
     bytes32 public constant DEPLOYER_ROLE = keccak256("DEPLOYER_ROLE");
 
     uint256 usd2ndRunRiskPenalty;
@@ -25,28 +23,28 @@ contract VaultKeeperTest is Deployer {
     function setUp() public {
         deploy();
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vaultKeeper.setRiskPenaltyFrameInSecond(10); // changed from default 24 hours 
         vm.stopPrank();
         nextBlock(1703753421);
     }
 
     function test_permission() public {
-        assertEq(vaultKeeper.defaultAdmin() , address(governanceTimelockController));
-        assertEq(vaultKeeper.hasRole(EXECUTOR_ROLE, address(governanceTimelockController)), true);
-        assertEq(vaultKeeper.hasRole(EXECUTOR_ROLE, address(emergencyTimelockController)), true);
+        assertEq(vaultKeeper.defaultAdmin() , address(zUniGovernance));
+        assertEq(vaultKeeper.hasRole(EXECUTOR_ROLE, address(zUniGovernance)), true);
+        // assertEq(vaultKeeper.hasRole(EXECUTOR_ROLE, address(emergencyTimelockController)), true);
         assertEq(vaultKeeper.hasRole(EXECUTOR_ROLE, keeperAddr), true);
         assertEq(vaultKeeper.hasRole(EXECUTOR_ROLE, address(vaultManager)), true);
 
-        assertEq(vaultKeeper.hasRole(MAINTAINER_ROLE, address(governanceTimelockController)), true);
-        assertEq(vaultKeeper.hasRole(MAINTAINER_ROLE, address(emergencyTimelockController)), true);
+        assertEq(vaultKeeper.hasRole(MAINTAINER_ROLE, address(zUniGovernance)), true);
+        // assertEq(vaultKeeper.hasRole(MAINTAINER_ROLE, address(emergencyTimelockController)), true);
         assertEq(vaultKeeper.hasRole(MAINTAINER_ROLE, keeperAddr), true);
         assertEq(vaultKeeper.hasRole(MAINTAINER_ROLE, address(config)), true);
 
-        assertEq(vaultKeeper.hasRole(DEPLOYER_ROLE, address(governanceTimelockController)), true);
-        assertEq(vaultKeeper.hasRole(DEPLOYER_ROLE, address(emergencyTimelockController)), true);
+        assertEq(vaultKeeper.hasRole(DEPLOYER_ROLE, address(zUniGovernance)), true);
+        // assertEq(vaultKeeper.hasRole(DEPLOYER_ROLE, address(emergencyTimelockController)), true);
 
-        assertEq(vaultKeeper.hasRole(UPGRADER_ROLE, address(tabProxyAdmin)), true);
+        assertEq(vaultKeeper.hasRole(UPGRADER_ROLE, address(zUniGovernance)), true);
 
         assertEq(vaultKeeper.vaultManager(), address(vaultManager));
         assertEq(vaultKeeper.riskPenaltyFrameInSecond(), 10);
@@ -54,7 +52,7 @@ contract VaultKeeperTest is Deployer {
         vm.expectRevert();
         vaultKeeper.beginDefaultAdminTransfer(owner);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vaultKeeper.beginDefaultAdminTransfer(owner);
         nextBlock(1 days + 1);
         vm.stopPrank();
@@ -66,10 +64,8 @@ contract VaultKeeperTest is Deployer {
     }
 
     function test_upgrade() public {
-        assertEq(tabProxyAdmin.owner(), address(governanceTimelockController));
-        vm.startPrank(address(governanceTimelockController));
-        tabProxyAdmin.upgradeAndCall(
-            ITransparentUpgradeableProxy(address(vaultKeeper)), 
+        vm.startPrank(address(zUniGovernance));
+        vaultKeeper.upgradeToAndCall(
             address(new VaultKeeper_newImpl()),
             abi.encodeWithSignature("upgraded(string)", "upgraded_v2")
         );
@@ -90,7 +86,7 @@ contract VaultKeeperTest is Deployer {
         vm.expectRevert(); // unauthorized
         vaultKeeper.updateVaultManagerAddress(owner);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
 
         vm.expectRevert(IVaultKeeper.ZeroAddress.selector);
         vaultKeeper.updateVaultManagerAddress(address(0));
@@ -126,7 +122,7 @@ contract VaultKeeperTest is Deployer {
         vm.expectRevert(); // unauthorized
         vaultKeeper.setTabParams(tabs, tabParams);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         
         vm.expectRevert(IConfig.InvalidArrayLength.selector);
         vaultKeeper.setTabParams(tabs, tabParams3);
@@ -162,7 +158,7 @@ contract VaultKeeperTest is Deployer {
         vm.expectRevert(); // unauthorized
         vaultKeeper.setRiskPenaltyFrameInSecond(value);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vm.expectRevert(IVaultKeeper.ZeroValue.selector);
         vaultKeeper.setRiskPenaltyFrameInSecond(0);
 
@@ -181,8 +177,8 @@ contract VaultKeeperTest is Deployer {
         vm.startPrank(deployer);
         cbBTC.mint(eoa_accounts[0], 10e8);
 
-        vm.startPrank(address(governanceTimelockController));
-        governanceAction.createNewTab(usd); // USD
+        vm.startPrank(address(zUniGovernance));
+        tabRegistry.createTab(usd); // USD
         nextBlock(1);
         priceOracle.setDirectPrice(usd, assignedPrice, block.timestamp);
 
@@ -211,7 +207,7 @@ contract VaultKeeperTest is Deployer {
             uint256 reserveAmt,
             uint256 osTab,
             uint256 reserveValue,
-            uint256 minReserveValue
+            uint256 minReserveValue,
         ) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, assignedPrice);
         assertEq(reserveAddr, address(cbBTC));
         assertEq(price, assignedPrice);
@@ -225,10 +221,10 @@ contract VaultKeeperTest is Deployer {
 
         // price dropped, RR below 180%, start charging risk penalty
         assignedPrice = 20000e18; 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         priceOracle.setDirectPrice(usd, assignedPrice, block.timestamp);
         vm.stopPrank();
-        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, priceOracle.getPrice(usd));
+        (,, price,, osTab, reserveValue, minReserveValue,) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, priceOracle.getPrice(usd));
         assertEq(price, assignedPrice);
         assertEq(osTab, 14298e18);
         assertEq(reserveValue, 20000e18);
@@ -253,7 +249,7 @@ contract VaultKeeperTest is Deployer {
         vaultKeeper.checkVault(block.timestamp, vd, priceData);
 
         // first checkVault, risk penalty not charged, still within same frame
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vaultKeeper.checkVault(block.timestamp, vd, priceData);
 
         uint256 delta = minReserveValue - reserveValue;
@@ -268,7 +264,7 @@ contract VaultKeeperTest is Deployer {
         vm.startPrank(eoa_accounts[0]);
         priceData = signer.getUpdatePriceSignature(tab, assignedPrice, block.timestamp);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vd = IVaultKeeper.VaultDetails(
             eoa_accounts[0],
             vaultId,
@@ -282,7 +278,7 @@ contract VaultKeeperTest is Deployer {
         emit IVaultKeeper.RiskPenaltyCharged(block.timestamp, eoa_accounts[0], vaultId, delta, Math.mulDiv(150, delta, 10000));
         vaultKeeper.checkVault(block.timestamp, vd, priceData);
 
-        (,,,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, assignedPrice);
+        (,,,, osTab, reserveValue, minReserveValue,) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, assignedPrice);
         assertEq(osTab, 14384046000000000000000); // minted tab 14298e18 + risk penalty charged 86046e15
         assertEq(reserveValue, 20000e18);
         assertEq(minReserveValue, 258912828e14);
@@ -301,14 +297,14 @@ contract VaultKeeperTest is Deployer {
         assignedPrice = 17000e18; // BTC/USD 17000
         nextBlock(106); // 10 frames passed
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         priceOracle.setDirectPrice(usd, assignedPrice, block.timestamp);
         vm.stopPrank();
 
-        (,,,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, assignedPrice);
+        (,,,, osTab, reserveValue, minReserveValue,) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, assignedPrice);
         vm.startPrank(eoa_accounts[0]);
         priceData = signer.getUpdatePriceSignature(tab, assignedPrice, block.timestamp);
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vd = IVaultKeeper.VaultDetails(
             eoa_accounts[0],
             vaultId,
@@ -326,7 +322,7 @@ contract VaultKeeperTest is Deployer {
         emit IVaultKeeper.RiskPenaltyCharged(block.timestamp, eoa_accounts[0], vaultId, 9050347435600000000000, 135755211534000000000); // current frame's risk penalty
         vaultKeeper.checkVault(block.timestamp, vd, priceData);
 
-        (,,,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, assignedPrice);
+        (,,,, osTab, reserveValue, minReserveValue,) = vaultUtils.getVaultDetails(eoa_accounts[0], vaultId, assignedPrice);
         // OS: 14384046000000000000000 + 88369242000000000000 + 135755211534000000000 = 14608170453534000000000
         assertEq(osTab, 14608170453534000000000);
         assertEq(reserveValue, 0);
@@ -343,9 +339,9 @@ contract VaultKeeperTest is Deployer {
         vm.startPrank(deployer);
         cbBTC.mint(eoa_accounts[0], 2e8);
 
-        vm.startPrank(address(governanceTimelockController));
-        governanceAction.createNewTab(usd); // USD
-        governanceAction.createNewTab(myr); // MYR
+        vm.startPrank(address(zUniGovernance));
+        tabRegistry.createTab(usd); // USD
+        tabRegistry.createTab(myr); // MYR
         nextBlock(1);
         priceOracle.setDirectPrice(usd, usdPrice, block.timestamp);
         priceOracle.setDirectPrice(myr, myrPrice, block.timestamp);
@@ -381,7 +377,7 @@ contract VaultKeeperTest is Deployer {
             uint256 reserveAmt,
             uint256 osTab,
             uint256 reserveValue,
-            uint256 minReserveValue
+            uint256 minReserveValue,
         ) = vaultUtils.getVaultDetails(eoa_accounts[0], 1, usdPrice);
         assertEq(keccak256(abi.encodePacked(tab)), keccak256(abi.encodePacked(usd))); // USD
         assertEq(reserveAddr, address(cbBTC));
@@ -391,7 +387,7 @@ contract VaultKeeperTest is Deployer {
         assertEq(reserveValue, 25738e18);
         assertEq(minReserveValue, 257364e17);
 
-        (tab, reserveAddr, price, reserveAmt, osTab, reserveValue, minReserveValue) =
+        (tab, reserveAddr, price, reserveAmt, osTab, reserveValue, minReserveValue,) =
             vaultUtils.getVaultDetails(eoa_accounts[0], 2, myrPrice);
         assertEq(keccak256(abi.encodePacked(tab)), keccak256(abi.encodePacked(myr))); // MYR
         assertEq(reserveAddr, address(cbBTC));
@@ -406,13 +402,13 @@ contract VaultKeeperTest is Deployer {
 
         // drop price, expect USD and MYR vaults to be charged risk penalty
         nextBlock(100);
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         usdPrice = 20000e18; // BTC/USD 20000
         myrPrice = 150000e18;
         priceOracle.setDirectPrice(usd, usdPrice, block.timestamp);
         priceOracle.setDirectPrice(myr, myrPrice, block.timestamp);
 
-        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], 1, usdPrice);
+        (,, price,, osTab, reserveValue, minReserveValue,) = vaultUtils.getVaultDetails(eoa_accounts[0], 1, usdPrice);
         assertEq(price, 20000e18);
         assertEq(osTab, 14298e18);
         assertEq(reserveValue, 20000e18);
@@ -432,7 +428,7 @@ contract VaultKeeperTest is Deployer {
             minReserveValue
         );
         // first checkVault, risk penalty not charged, still within same frame
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vaultKeeper.checkVault(block.timestamp, vd, priceData);
 
         uint256 delta = minReserveValue - reserveValue;
@@ -441,7 +437,7 @@ contract VaultKeeperTest is Deployer {
         assertEq(vaultOwner, eoa_accounts[0]);
         assertEq(vaultKeeper.vaultIdList(listIndex), 1);
 
-        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], 2, myrPrice);
+        (,, price,, osTab, reserveValue, minReserveValue,) = vaultUtils.getVaultDetails(eoa_accounts[0], 2, myrPrice);
         assertEq(price, 150000e18);
         assertEq(osTab, 97001910184158850789691);
         assertEq(reserveValue, 150000e18);
@@ -461,7 +457,7 @@ contract VaultKeeperTest is Deployer {
             reserveValue,
             minReserveValue
         );
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vaultKeeper.checkVault(block.timestamp, vd, priceData);
 
         delta = minReserveValue - reserveValue;
@@ -475,11 +471,11 @@ contract VaultKeeperTest is Deployer {
         nextBlock(1);
         usdPrice = 19000e18; // BTC/USD 19000
         myrPrice = 155000e18;
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         priceOracle.setDirectPrice(usd, usdPrice, block.timestamp);
         priceOracle.setDirectPrice(myr, myrPrice, block.timestamp);
         
-        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], 1, usdPrice);
+        (,, price,, osTab, reserveValue, minReserveValue,) = vaultUtils.getVaultDetails(eoa_accounts[0], 1, usdPrice);
         assertEq(price, 19000e18);
         assertEq(osTab, 14298e18); // same as previous, delta(risk penalty) not yet reflected into OS
         assertEq(reserveValue, 19000e18);
@@ -499,7 +495,7 @@ contract VaultKeeperTest is Deployer {
         );
 
         // checkVault
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vaultKeeper.checkVault(block.timestamp, vd, priceData);
 
         delta = minReserveValue - reserveValue;
@@ -511,7 +507,7 @@ contract VaultKeeperTest is Deployer {
         uint256 usd2ndRunDelta = delta;
 
         nextBlock(1);
-        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], 2, myrPrice);
+        (,, price,, osTab, reserveValue, minReserveValue,) = vaultUtils.getVaultDetails(eoa_accounts[0], 2, myrPrice);
         assertEq(price, 155000e18);
         assertEq(osTab, 97001910184158850789691);
         assertEq(reserveValue, 155000e18);
@@ -529,7 +525,7 @@ contract VaultKeeperTest is Deployer {
             reserveValue,
             minReserveValue
         );
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vaultKeeper.checkVault(block.timestamp, vd, priceData);
         delta = minReserveValue - reserveValue;
         assertEq(24603438331485931421443, vaultKeeper.largestVaultDelta(eoa_accounts[0], 2)); // same as prev.
@@ -541,11 +537,11 @@ contract VaultKeeperTest is Deployer {
         nextBlock(10);
         usdPrice = 15000e18;
         myrPrice = 100000e18;
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         priceOracle.setDirectPrice(usd, usdPrice, block.timestamp);
         priceOracle.setDirectPrice(myr, myrPrice, block.timestamp);
 
-        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], 1, usdPrice);
+        (,, price,, osTab, reserveValue, minReserveValue,) = vaultUtils.getVaultDetails(eoa_accounts[0], 1, usdPrice);
         assertEq(price, 15000e18);
         assertEq(osTab, 14298e18);
         assertEq(reserveValue, 15000e18);
@@ -566,7 +562,7 @@ contract VaultKeeperTest is Deployer {
         myr1stRunRiskPenalty = Math.mulDiv(150, firstRunMyrDelta, 10000);
 
         // checkVault
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vm.expectEmit(false, false, false, false, address(vaultKeeper));
         emit IVaultKeeper.RiskPenaltyCharged(block.timestamp, eoa_accounts[0], 1, usd2ndRunDelta, usd2ndRunRiskPenalty); 
         vm.expectEmit(false, false, false, false, address(vaultKeeper));
@@ -575,14 +571,14 @@ contract VaultKeeperTest is Deployer {
         emit IVaultKeeper.StartVaultLiquidation(block.timestamp, eoa_accounts[0], 1, usd3rdRunRiskPenalty);
         vaultKeeper.checkVault(block.timestamp, vd, priceData);
 
-        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], 1, usdPrice);
+        (,, price,, osTab, reserveValue, minReserveValue,) = vaultUtils.getVaultDetails(eoa_accounts[0], 1, usdPrice);
         assertEq(price, 15000e18);
         assertEq(osTab, 14298e18 + usd2ndRunRiskPenalty + usd3rdRunRiskPenalty);
         assertEq(reserveValue, 0);
         assertEq(minReserveValue, Math.mulDiv(osTab, 180, 100));
 
         nextBlock(1);
-        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], 2, myrPrice);
+        (,, price,, osTab, reserveValue, minReserveValue,) = vaultUtils.getVaultDetails(eoa_accounts[0], 2, myrPrice);
         assertEq(price, 100000e18);
         assertEq(osTab, 97001910184158850789691 + myr1stRunRiskPenalty);
         assertEq(reserveValue, 100000e18);
@@ -602,7 +598,7 @@ contract VaultKeeperTest is Deployer {
             minReserveValue
         );
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vm.expectEmit(address(vaultKeeper));
         emit IVaultKeeper.StartVaultLiquidation(block.timestamp, eoa_accounts[0], 2, Math.mulDiv(150, delta, 10000));
         vaultKeeper.checkVault(block.timestamp, vd, priceData);
@@ -616,8 +612,8 @@ contract VaultKeeperTest is Deployer {
         vm.startPrank(deployer);
         cbBTC.mint(eoa_accounts[0], 1e8);
 
-        vm.startPrank(address(governanceTimelockController));
-        governanceAction.createNewTab(usd); // USD
+        vm.startPrank(address(zUniGovernance));
+        tabRegistry.createTab(usd); // USD
         nextBlock(1);
         priceOracle.setDirectPrice(usd, assignedPrice, block.timestamp);
 
@@ -641,7 +637,7 @@ contract VaultKeeperTest is Deployer {
         nextBlock(1 days);
         assignedPrice = 8000e18;
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         priceOracle.setDirectPrice(usd, assignedPrice, block.timestamp);
 
         (
@@ -651,7 +647,7 @@ contract VaultKeeperTest is Deployer {
             uint256 reserveAmt,
             uint256 osTab,
             uint256 reserveValue,
-            uint256 minReserveValue
+            uint256 minReserveValue,
         ) = vaultUtils.getVaultDetails(eoa_accounts[0], 1, assignedPrice);
         assertEq(price, 8000e18);
         assertEq(reserveAmt, 1e18);
@@ -671,7 +667,7 @@ contract VaultKeeperTest is Deployer {
             reserveValue,
             minReserveValue
         );
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vaultKeeper.checkVault(block.timestamp, vd, priceData);
 
         uint256 delta = minReserveValue - reserveValue;
@@ -689,17 +685,17 @@ contract VaultKeeperTest is Deployer {
         priceData = signer.getUpdatePriceSignature(usd, assignedPrice, block.timestamp);
         // withdrawal more than max. withdraw due to 555e18 did not consider pending risk penalty to charge
         vm.expectRevert(abi.encodeWithSelector(IVaultManager.ExceededWithdrawable.selector, 540555555555555555555));
-        vaultManager.withdrawTab(1, 555e18, priceData);
+        vaultManager.withdrawTab(1, 555e18, msg.sender, priceData);
 
         priceData = signer.getUpdatePriceSignature(usd, assignedPrice, block.timestamp);
         vm.expectEmit(address(vaultManager));
-        emit IVaultManager.TabWithdraw(eoa_accounts[0], 1, 540e18, 5540e18);
+        emit IVaultManager.TabWithdraw(eoa_accounts[0], 1, msg.sender, 540e18, 5540e18);
         // withdraw tab, max withdraw 5555, deduct os 5555 - 5015 = 540
-        vaultManager.withdrawTab(1, 540e18, priceData); 
+        vaultManager.withdrawTab(1, 540e18, msg.sender, priceData); 
 
         vm.stopPrank();
 
-        (,, price,, osTab, reserveValue, minReserveValue) = vaultUtils.getVaultDetails(eoa_accounts[0], 1, assignedPrice);
+        (,, price,, osTab, reserveValue, minReserveValue,) = vaultUtils.getVaultDetails(eoa_accounts[0], 1, assignedPrice);
         assertEq(price, 10000e18);
         assertEq(osTab, 5555e18);
         assertEq(reserveValue, 10000e18);

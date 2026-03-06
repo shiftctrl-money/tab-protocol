@@ -2,9 +2,7 @@
 pragma solidity 0.8.28;
 
 import {console} from "forge-std/console.sol";
-import {Deployer} from "./Deployer.t.sol";
-import {ITransparentUpgradeableProxy} 
-    from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {UniDeployer} from "./UniDeployer.t.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Dec18BTC} from "./token/Dec18BTC.sol";
 import {CBBTC} from "../contracts/token/CBBTC.sol";
@@ -14,9 +12,8 @@ import {IVaultManager} from "../contracts/interfaces/IVaultManager.sol";
 import {IProtocolVault} from "../contracts/interfaces/IProtocolVault.sol";
 import {IPriceOracle} from "../contracts/interfaces/IPriceOracle.sol";
 import {ITabRegistry} from "../contracts/interfaces/ITabRegistry.sol";
-import {IGovernanceAction} from "../contracts/interfaces/IGovernanceAction.sol";
 
-contract ProtocolVaultTest is Deployer {
+contract ProtocolVaultTest is UniDeployer {
     bytes32 public constant CTRL_ALT_DEL_ROLE = keccak256("CTRL_ALT_DEL_ROLE");
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -40,15 +37,17 @@ contract ProtocolVaultTest is Deployer {
     function setUp() public {
         deploy();
 
-        vm.startPrank(address(governanceTimelockController));
-        governanceAction.createNewTab(usd);
-        governanceAction.createNewTab(afn);
-        governanceAction.createNewTab(all);
+        vm.startPrank(address(zUniGovernance));
+        tabRegistry.createTab(usd);
+        tabRegistry.createTab(afn);
+        tabRegistry.createTab(all);
         usdAddr = tabRegistry.getTabAddress(usd);
         afnAddr = tabRegistry.getTabAddress(afn);
         allAddr = tabRegistry.getTabAddress(all);
         
-        governanceAction.addPriceOracleProvider(
+        priceOracleManager.addProvider(
+            block.number,
+            block.timestamp,
             eoa_accounts[7], // provider
             address(ctrl), // paymentTokenAddress
             1e18, // paymentAmtPerFeed
@@ -68,8 +67,8 @@ contract ProtocolVaultTest is Deployer {
         wBTC2 = cbBTC;
         reserve_WBTC2 = address(wBTC2);
 
-        governanceAction.addReserve(reserve_ctrlBTC, address(reserveSafe));        
-        governanceAction.addReserve(reserve_WBTC1, address(reserveSafe));
+        reserveRegistry.addReserve(reserve_ctrlBTC, address(reserveSafe));        
+        reserveRegistry.addReserve(reserve_WBTC1, address(reserveSafe));
         
         vm.stopPrank();
 
@@ -109,18 +108,18 @@ contract ProtocolVaultTest is Deployer {
     }
 
     function test_permission() public {
-        assertEq(protocolVault.defaultAdmin() , address(governanceTimelockController));
-        assertEq(protocolVault.hasRole(MANAGER_ROLE, address(governanceTimelockController)), true);
-        assertEq(protocolVault.hasRole(CTRL_ALT_DEL_ROLE, address(governanceTimelockController)), true);
+        assertEq(protocolVault.defaultAdmin() , address(zUniGovernance));
+        assertEq(protocolVault.hasRole(MANAGER_ROLE, address(zUniGovernance)), true);
+        assertEq(protocolVault.hasRole(CTRL_ALT_DEL_ROLE, address(zUniGovernance)), true);
         assertEq(protocolVault.hasRole(CTRL_ALT_DEL_ROLE, address(vaultManager)), true);
-        assertEq(protocolVault.hasRole(UPGRADER_ROLE, address(tabProxyAdmin)), true);
+        assertEq(protocolVault.hasRole(UPGRADER_ROLE, address(zUniGovernance)), true);
 
         assertEq(protocolVault.reserveSafe(), address(reserveSafe));
         
         vm.expectRevert();
         protocolVault.beginDefaultAdminTransfer(owner);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         protocolVault.beginDefaultAdminTransfer(owner);
         nextBlock(1 days + 1);
         vm.stopPrank();
@@ -132,12 +131,11 @@ contract ProtocolVaultTest is Deployer {
     }
 
     function test_upgrade() public {
-        assertEq(tabProxyAdmin.owner(), address(governanceTimelockController));
-        vm.startPrank(address(governanceTimelockController));
-        tabProxyAdmin.upgradeAndCall(
-            ITransparentUpgradeableProxy(address(protocolVault)), 
-            address(new ProtocolVault_newImpl()),
-            abi.encodeWithSignature("upgraded(string)", "upgraded_v2")
+        vm.startPrank(address(zUniGovernance));
+        ProtocolVault_newImpl v2 = new ProtocolVault_newImpl();
+        protocolVault.upgradeToAndCall(
+            address(v2),
+            abi.encodeCall(ProtocolVault_newImpl.upgraded, ("upgraded_v2"))
         );
 
         ProtocolVault_newImpl upgraded_v2 = ProtocolVault_newImpl(address(protocolVault));
@@ -155,7 +153,7 @@ contract ProtocolVaultTest is Deployer {
         vm.expectRevert(); // unauthorized
         protocolVault.updateReserveSafe(owner);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vm.expectRevert(IProtocolVault.ZeroAddress.selector);
         protocolVault.updateReserveSafe(address(0));
 
@@ -172,7 +170,7 @@ contract ProtocolVaultTest is Deployer {
     function test_initCtrlAltDel() public {
         address protocolVaultAddr = address(protocolVault);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         
         vm.expectEmit(protocolVaultAddr);
         emit IProtocolVault.InitCtrlAltDel(
@@ -214,12 +212,9 @@ contract ProtocolVaultTest is Deployer {
         vm.expectEmit(address(tabRegistry));
         emit ITabRegistry.TriggeredCtrlAltDelTab(usd, fixedPrice);
 
-        vm.expectEmit(address(governanceAction));
-        emit IGovernanceAction.CtrlAltDelTab(usd, fixedPrice);
-
         // oracle price value = 136218495510421100881726, set to
         // fixed price 139777768634848658534534
-        governanceAction.ctrlAltDel(usd, fixedPrice); 
+        tabRegistry.ctrlAltDel(usd, fixedPrice); 
 
         vm.stopPrank();
 
@@ -258,18 +253,18 @@ contract ProtocolVaultTest is Deployer {
     }
 
     function test_initCtrlAltDel_revert() public {
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         
         vm.expectRevert();
-        governanceAction.ctrlAltDel(usd, 0);
+        tabRegistry.ctrlAltDel(usd, 0);
 
         vm.expectRevert(IProtocolVault.ZeroValue.selector);
         protocolVault.initCtrlAltDel(reserve_ctrlBTC, 1e18, usdAddr, 100e18, 0);
 
-        governanceAction.ctrlAltDel(usd, fixedPrice);
+        tabRegistry.ctrlAltDel(usd, fixedPrice);
 
         vm.expectRevert(ITabRegistry.ExecutedDepeg.selector);
-        governanceAction.ctrlAltDel(usd, fixedPrice);
+        tabRegistry.ctrlAltDel(usd, fixedPrice);
 
         vm.expectRevert(IProtocolVault.ExistedProtovolVault.selector);
         protocolVault.initCtrlAltDel(reserve_ctrlBTC, 1e18, usdAddr, 100e18, fixedPrice);
@@ -282,8 +277,8 @@ contract ProtocolVaultTest is Deployer {
     }
 
     function test_initCtrlAltDel_postStatus() public {
-        vm.startPrank(address(governanceTimelockController));
-        governanceAction.ctrlAltDel(usd, fixedPrice);
+        vm.startPrank(address(zUniGovernance));
+        tabRegistry.ctrlAltDel(usd, fixedPrice);
         vm.stopPrank();
 
         IVaultManager.Vault memory m;
@@ -295,43 +290,43 @@ contract ProtocolVaultTest is Deployer {
         vaultManager.vaultOwners(eoa_accounts[0], 7); // index 7 is not existed for owner eoa_accounts[0]
 
         console.log("Checking post ctl-alt-del vault status of owner: ", eoa_accounts[0]);
-        (, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 1);
+        (,, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 1);
         assertEq(m.reserveAmt, 5e18 - Math.mulDiv(10000e18, 1e18, fixedPrice));
         assertEq(m.tabAmt, 0);
         assertEq(m.osTabAmt, 0);
         assertEq(m.pendingOsMint, 0);
 
-        (, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 2);
+        (,, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 2);
         assertEq(m.reserveAmt, 2e18 - Math.mulDiv(1234e18, 1e18, fixedPrice));
         assertEq(m.tabAmt, 0);
         assertEq(m.osTabAmt, 0);
         assertEq(m.pendingOsMint, 0);
 
-        (, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 3);
+        (,, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 3);
         assertEq(m.reserveAmt, 1e17); // tab is not ctrl-alt-del, full reserve remained
         assertEq(m.tabAmt, 1e18);
         assertEq(m.osTabAmt, 0);
         assertEq(m.pendingOsMint, 0);
 
-        (, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 4);
+        (,, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 4);
         assertEq(m.reserveAmt, 5e18 - Math.mulDiv(1648e18, 1e18, fixedPrice));
         assertEq(m.tabAmt, 0);
         assertEq(m.osTabAmt, 0);
         assertEq(m.pendingOsMint, 0);
 
-        (, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 5);
+        (,, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 5);
         assertEq(m.reserveAmt, 5e18 - Math.mulDiv(20400e18, 1e18, fixedPrice) );
         assertEq(m.tabAmt, 0);
         assertEq(m.osTabAmt, 0);
         assertEq(m.pendingOsMint, 0);
 
-        (, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 6);
+        (,, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 6);
         assertEq(m.reserveAmt, 1e17); // tab is not ctrl-alt-del, full reserve remained
         assertEq(m.tabAmt, 1e18);
         assertEq(m.osTabAmt, 0);
         assertEq(m.pendingOsMint, 0);
 
-        (, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 7);
+        (,, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 7);
         assertEq(m.reserveAmt, 5e18 - Math.mulDiv(10000e18, 1e18, fixedPrice));
         assertEq(m.tabAmt, 0);
         assertEq(m.osTabAmt, 0);
@@ -342,7 +337,7 @@ contract ProtocolVaultTest is Deployer {
 
         priceData = signer.getUpdatePriceSignature(afn, priceOracle.getPrice(afn), block.timestamp);
         vm.expectRevert(abi.encodeWithSelector(IVaultManager.ExceededWithdrawable.selector, 99999339181021902));
-        vaultManager.withdrawReserve(3, 1e17, priceData); // vault's tab is not ctrl-alt-del
+        vaultManager.withdrawReserve(3, 1e17, eoa_accounts[0], priceData); // vault's tab is not ctrl-alt-del
 
         address reserveSafeAddr = reserveRegistry.reserveAddrSafe(reserve_ctrlBTC);
         uint256 balB4 = cBTC.balanceOf(reserveSafeAddr);
@@ -350,6 +345,7 @@ contract ProtocolVaultTest is Deployer {
         vaultManager.withdrawReserve(
             1, 
             5e18 - Math.mulDiv(10000e18, 1e18, fixedPrice), 
+            eoa_accounts[0], 
             signer.getUpdatePriceSignature(usd, priceOracle.getPrice(usd), block.timestamp)
         );
         uint256 balAfter = cBTC.balanceOf(reserveSafeAddr);
@@ -358,6 +354,7 @@ contract ProtocolVaultTest is Deployer {
         vaultManager.withdrawReserve(
             2, 
             2e18 - Math.mulDiv(1234e18, 1e18, fixedPrice), 
+            eoa_accounts[0], 
             signer.getUpdatePriceSignature(usd, priceOracle.getPrice(usd), block.timestamp)
         );
 
@@ -365,6 +362,7 @@ contract ProtocolVaultTest is Deployer {
         vaultManager.withdrawReserve(
             4, 
             5e18 - Math.mulDiv(1648e18, 1e18, fixedPrice), 
+            eoa_accounts[0], 
             signer.getUpdatePriceSignature(usd, priceOracle.getPrice(usd), block.timestamp)
         );
 
@@ -372,7 +370,7 @@ contract ProtocolVaultTest is Deployer {
         // owner received excess reserve
         assertEq(balB4 + 5e18 - Math.mulDiv(1648e18, 1e18, fixedPrice), balAfter); 
 
-        (, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 4);
+        (,, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[0], 4);
         assertEq(m.reserveAmt, 0); // no more reserve in the vault
         assertEq(m.tabAmt, 0);
 
@@ -393,8 +391,8 @@ contract ProtocolVaultTest is Deployer {
         assertEq(bal2, 5e18 + 1e17 + 1e17 + 1e18);
         assertEq(bal3, 5e8 + 2e8 + 5e8);
 
-        vm.startPrank(address(governanceTimelockController));
-        governanceAction.ctrlAltDel(usd, fixedPrice);
+        vm.startPrank(address(zUniGovernance));
+        tabRegistry.ctrlAltDel(usd, fixedPrice);
         vm.stopPrank();
 
         // transferred from Safe into ProtocolVault
@@ -438,8 +436,8 @@ contract ProtocolVaultTest is Deployer {
         address protocolVaultAddr = address(protocolVault);
         TabERC20 sUSD = TabERC20(usdAddr);
 
-        vm.startPrank(address(governanceTimelockController));
-        governanceAction.ctrlAltDel(usd, fixedPrice);
+        vm.startPrank(address(zUniGovernance));
+        tabRegistry.ctrlAltDel(usd, fixedPrice);
         sUSD.grantRole(MINTER_ROLE, protocolVaultAddr);
         vm.stopPrank();
 
@@ -463,20 +461,20 @@ contract ProtocolVaultTest is Deployer {
         uint256 tabBalB4 = sUSD.balanceOf(eoa_accounts[5]);
         
         vm.expectRevert(IProtocolVault.NotExistedProtocolVault.selector);
-        protocolVault.buyTab(owner, usdAddr, 1e18);
+        protocolVault.buyTab(owner, 1e18, usdAddr, owner);
         vm.expectRevert(IProtocolVault.ZeroValue.selector);
-        protocolVault.buyTab(reserve_ctrlBTC, usdAddr, 0);
+        protocolVault.buyTab(reserve_ctrlBTC, 0, usdAddr, owner);
         vm.expectRevert(IProtocolVault.NotExistedProtocolVault.selector);
-        protocolVault.sellTab(owner, usdAddr, 1e18);
+        protocolVault.sellTab(owner, usdAddr, 1e18, owner);
         vm.expectRevert(IProtocolVault.ZeroValue.selector);
-        protocolVault.sellTab(reserve_ctrlBTC, usdAddr, 0);
+        protocolVault.sellTab(reserve_ctrlBTC, usdAddr, 0, owner);
 
         // Sell TAB, buy BTC
         vm.expectEmit();
         emit IProtocolVault.SellTab(
             eoa_accounts[5], reserve_ctrlBTC, Math.mulDiv(43523e15, 1e18, fixedPrice), usdAddr, 43523e15
         );
-        uint256 value = protocolVault.sellTab(reserve_ctrlBTC, usdAddr, 43523e15);
+        uint256 value = protocolVault.sellTab(reserve_ctrlBTC, usdAddr, 43523e15, eoa_accounts[5]);
         uint256 newReserveAmt = v.reserveAmt - value;
         value = reserveSafe.getNativeTransferAmount(reserve_ctrlBTC, value);
 
@@ -493,7 +491,7 @@ contract ProtocolVaultTest is Deployer {
         // Sell BTC, buy TAB
         vm.expectEmit();
         emit IProtocolVault.BuyTab(eoa_accounts[5], reserve_ctrlBTC, 1e17, usdAddr, Math.mulDiv(1e17, fixedPrice, 1e18));
-        value = protocolVault.buyTab(reserve_ctrlBTC, usdAddr, 1e17); // spend 1e17 btc to buy tab
+        value = protocolVault.buyTab(reserve_ctrlBTC, 1e17, usdAddr, eoa_accounts[5]); // spend 1e17 btc to buy tab
 
         assertEq(userBtcBalB4 - 1e17, cBTC.balanceOf(eoa_accounts[5])); // user wallet spent btc
         assertEq(btcBalB4 + 1e17, cBTC.balanceOf(protocolVaultAddr)); // vault increased btc reserve
@@ -503,7 +501,7 @@ contract ProtocolVaultTest is Deployer {
         userBtcBalB4 = wBTC2.balanceOf(eoa_accounts[5]);
         btcBalB4 = wBTC2.balanceOf(protocolVaultAddr);
         tabBalB4 = sUSD.balanceOf(eoa_accounts[5]);
-        value = protocolVault.sellTab(reserve_WBTC2, usdAddr, 432e18);
+        value = protocolVault.sellTab(reserve_WBTC2, usdAddr, 432e18, eoa_accounts[5]);
         
         assertEq(Math.mulDiv(432e18, 1e18, fixedPrice), value);
         assertEq(wBTC2.balanceOf(eoa_accounts[5]), userBtcBalB4 + reserveSafe.getNativeTransferAmount(reserve_WBTC2, value));
@@ -514,7 +512,7 @@ contract ProtocolVaultTest is Deployer {
         userBtcBalB4 = wBTC2.balanceOf(eoa_accounts[5]);
         btcBalB4 = wBTC2.balanceOf(protocolVaultAddr);
         tabBalB4 = sUSD.balanceOf(eoa_accounts[5]);
-        value = protocolVault.buyTab(reserve_WBTC2, usdAddr, 100e18);
+        value = protocolVault.buyTab(reserve_WBTC2, 100e18, usdAddr, eoa_accounts[5]);
         assertEq(Math.mulDiv(100e18, fixedPrice, 1e18), value);
         assertEq(wBTC2.balanceOf(eoa_accounts[5]), userBtcBalB4 - 100e8);
         assertEq(wBTC2.balanceOf(protocolVaultAddr), btcBalB4 + 100e8);
@@ -537,20 +535,20 @@ contract ProtocolVaultTest is Deployer {
         vm.startPrank(eoa_accounts[1]);
         sUSD.transfer(eoa_accounts[5], 1e18); // wBTC1
 
-        vm.startPrank(address(governanceTimelockController));
-        governanceAction.ctrlAltDel(usd, fixedPrice);
+        vm.startPrank(address(zUniGovernance));
+        tabRegistry.ctrlAltDel(usd, fixedPrice);
         sUSD.grantRole(MINTER_ROLE, protocolVaultAddr);
         vm.stopPrank();
 
         vm.startPrank(eoa_accounts[5]);
         sUSD.approve(protocolVaultAddr, type(uint256).max);
 
-        protocolVault.sellTab(reserve_WBTC1, usdAddr, 1648e18 + 1e18);
+        protocolVault.sellTab(reserve_WBTC1, usdAddr, 1648e18 + 1e18, msg.sender);
         (v.reserveAddr, v.reserveAmt, v.tab, v.tabAmt, v.price) = protocolVault.vaults(reserve_WBTC1, usdAddr);
         assertEq(v.reserveAmt, 0);
         assertEq(v.tabAmt, 0);
 
-        protocolVault.sellTab(reserve_WBTC2, usdAddr, 20400e18 + 1234e18);
+        protocolVault.sellTab(reserve_WBTC2, usdAddr, 20400e18 + 1234e18, msg.sender);
         (v.reserveAddr, v.reserveAmt, v.tab, v.tabAmt, v.price) = protocolVault.vaults(reserve_WBTC2, usdAddr);
         assertEq(v.reserveAmt, 0);
         assertEq(v.tabAmt, 0);
@@ -560,7 +558,7 @@ contract ProtocolVaultTest is Deployer {
 
         vm.startPrank(eoa_accounts[5]);
         vm.expectRevert(IProtocolVault.InsufficientReserveBalance.selector);
-        protocolVault.sellTab(reserve_WBTC1, usdAddr, 100e18);
+        protocolVault.sellTab(reserve_WBTC1, usdAddr, 100e18, msg.sender);
     }
 
     function test_PendingOSVault(uint256 riskPenaltyToCharge) public {
@@ -588,8 +586,8 @@ contract ProtocolVaultTest is Deployer {
         vm.startPrank(address(vaultKeeper));
         vaultManager.chargeRiskPenalty(eoa_accounts[1], 8, riskPenaltyToCharge); 
 
-        vm.startPrank(address(governanceTimelockController));
-        governanceAction.ctrlAltDel(afn, fixedPrice);
+        vm.startPrank(address(zUniGovernance));
+        tabRegistry.ctrlAltDel(afn, fixedPrice);
 
         assertEq(treasuryBalB4 + riskPenaltyToCharge, sAFN.balanceOf(config.treasury()));
 
@@ -598,7 +596,7 @@ contract ProtocolVaultTest is Deployer {
         assertEq(v.tabAmt, 20400e18 + riskPenaltyToCharge);
 
         IVaultManager.Vault memory m;
-        (, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[1], 8);
+        (,, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[1], 8);
         assertEq(m.reserveAmt, 5e18 - v.reserveAmt); // remaining reserve in user vault
         assertEq(m.tabAmt, 0); // all OS amounts are zero after ctrl-alt-del
         assertEq(m.osTabAmt, 0);
@@ -610,8 +608,8 @@ contract ProtocolVaultTest is Deployer {
         fixedPrice = 20000e18; // 1 BTC = 20,000 TAB
         bytes3 xls = bytes3(abi.encodePacked("XLS"));
 
-        vm.startPrank(address(governanceTimelockController));
-        governanceAction.createNewTab(xls);
+        vm.startPrank(address(zUniGovernance));
+        tabRegistry.createTab(xls);
         vm.stopPrank();
         
         address tab4Addr = tabRegistry.getTabAddress(xls);
@@ -643,7 +641,7 @@ contract ProtocolVaultTest is Deployer {
         vaultManager.chargeRiskPenalty(eoa_accounts[5], 10, 3000e18);
         vaultManager.chargeRiskPenalty(eoa_accounts[6], 11, 1500e18);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vm.expectEmit(address(protocolVault));
         emit IProtocolVault.InitCtrlAltDel(reserve_cbBTC, 445583e14, tab4Addr, 891166e18, fixedPrice);
 
@@ -656,10 +654,7 @@ contract ProtocolVaultTest is Deployer {
         vm.expectEmit(address(tabRegistry));
         emit ITabRegistry.TriggeredCtrlAltDelTab(xls, fixedPrice);
 
-        vm.expectEmit(address(governanceAction));
-        emit IGovernanceAction.CtrlAltDelTab(xls, fixedPrice);
-
-        governanceAction.ctrlAltDel(xls, fixedPrice);
+        tabRegistry.ctrlAltDel(xls, fixedPrice);
 
         bytes3[] memory postDepegTabs = tabRegistry.getCtrlAltDelTabList();
         assertEq(postDepegTabs[0], xls);
@@ -675,25 +670,25 @@ contract ProtocolVaultTest is Deployer {
         assertEq(v.price, fixedPrice);
 
         IVaultManager.Vault memory m;
-        (, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[5], 10);
+        (,, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[5], 10);
         assertEq(m.reserveAmt, 285e16);
         assertEq(m.tabAmt, 0);
         assertEq(m.osTabAmt, 0);
         assertEq(m.pendingOsMint, 0);
 
-        (, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[6], 11);
+        (,, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[6], 11);
         assertEq(m.reserveAmt, 3925e15);
         assertEq(m.tabAmt, 0);
         assertEq(m.osTabAmt, 0);
         assertEq(m.pendingOsMint, 0);
 
-        (, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[7], 12);
+        (,, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[7], 12);
         assertEq(m.reserveAmt, 20e18);
         assertEq(m.tabAmt, 0);
         assertEq(m.osTabAmt, 0);
         assertEq(m.pendingOsMint, 0);
 
-        (, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[8], 13);
+        (,, m.reserveAmt,, m.tabAmt, m.osTabAmt, m.pendingOsMint) = vaultManager.vaults(eoa_accounts[8], 13);
         assertEq(m.reserveAmt, 16667e14);
         assertEq(m.tabAmt, 0);
         assertEq(m.osTabAmt, 0);

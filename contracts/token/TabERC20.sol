@@ -19,6 +19,8 @@ contract TabERC20 is
     AccessControlDefaultAdminRulesUpgradeable,
     ERC20PermitUpgradeable
 {
+    bytes32 public constant tabVersion = keccak256("v1");
+
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -29,6 +31,7 @@ contract TabERC20 is
     function initialize(
         address defaultAdmin, 
         address minter, 
+        address minter2,
         string calldata _name, 
         string calldata _symbol
     ) 
@@ -40,7 +43,8 @@ contract TabERC20 is
         __AccessControlDefaultAdminRules_init(1 days, defaultAdmin);
         __ERC20Permit_init(_name);
         
-        _grantRole(MINTER_ROLE, minter);
+        _grantRole(MINTER_ROLE, minter);    // TabFactory, callable by VaultManager only
+        _grantRole(MINTER_ROLE, minter2);   // UniversalTab, callable by cross-chain transfer only
     }
 
     /// @dev For example, when Tab symbol is sUSD, the function returns 0x555344.

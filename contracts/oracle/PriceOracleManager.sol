@@ -165,7 +165,7 @@ contract PriceOracleManager is
      * @param blockCountPerFeed Assume 5-min feed interval and 2s block gen. time,
      * each feed is expected to arrive within 60/2 * 5 = 150 blocks.
      * @param feedSize Minimum currency pairs provided
-     * @param whitelistedIPAddr Comma separated IP Address(es). Provider needs to send feeds from these IP Addresses.
+     * @param whitelistedIpAddr Comma separated IP Address(es). Provider needs to send feeds from these IP Addresses.
      */
     function addProvider(
         uint256 blockNum,
@@ -175,7 +175,7 @@ contract PriceOracleManager is
         uint256 paymentAmtPerFeed,
         uint256 blockCountPerFeed,
         uint256 feedSize,
-        bytes32 whitelistedIPAddr
+        bytes32 whitelistedIpAddr
     )
         external
         onlyRole(MAINTAINER_ROLE)
@@ -210,7 +210,7 @@ contract PriceOracleManager is
             paymentAmtPerFeed, 
             blockCountPerFeed, 
             feedSize, 
-            whitelistedIPAddr
+            whitelistedIpAddr
         );
         providerTracker[provider] = Tracker(
             timestamp, 
@@ -230,7 +230,7 @@ contract PriceOracleManager is
             paymentAmtPerFeed,
             blockCountPerFeed,
             feedSize,
-            whitelistedIPAddr
+            whitelistedIpAddr
         );
     }
 
@@ -240,7 +240,7 @@ contract PriceOracleManager is
         uint256 paymentAmtPerFeed,
         uint256 blockCountPerFeed,
         uint256 feedSize,
-        bytes32 whitelistedIPAddr
+        bytes32 whitelistedIpAddr
     )
         external
         onlyRole(MAINTAINER_ROLE)
@@ -265,7 +265,7 @@ contract PriceOracleManager is
         providerInfo[provider].paymentAmtPerFeed = paymentAmtPerFeed;
         providerInfo[provider].blockCountPerFeed = blockCountPerFeed;
         providerInfo[provider].feedSize = feedSize;
-        providerInfo[provider].whitelistedIPAddr = whitelistedIPAddr;
+        providerInfo[provider].whitelistedIpAddr = whitelistedIpAddr;
 
         emit ConfigProvider(
             provider, 
@@ -273,7 +273,7 @@ contract PriceOracleManager is
             paymentAmtPerFeed, 
             blockCountPerFeed, 
             feedSize, 
-            whitelistedIPAddr
+            whitelistedIpAddr
         );
     }
 

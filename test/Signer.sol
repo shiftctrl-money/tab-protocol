@@ -6,12 +6,13 @@ import "forge-std/Test.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {IPriceOracle} from "../contracts/interfaces/IPriceOracle.sol";
+import {IPriceData} from "../contracts/interfaces/IUniTabOperation.sol";
 
 // PriceOracle signer
 contract Signer is Test {
     bytes32 private constant _TYPE_HASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-    bytes32 _DATA_TYPEHASH = keccak256("UpdatePriceData(address owner,address updater,bytes3 tab,uint256 price,uint256 timestamp,uint256 nonce)");
+    bytes32 _DATA_TYPEHASH = keccak256("UpdatePriceData(address signer,address updater,uint256 chainID,bytes3 tab,uint256 price,uint256 timestamp,uint256 nonce)");
 
     string name;
     string version;
@@ -48,14 +49,26 @@ contract Signer is Test {
         uint256 _timestamp
     )
         external  
-        returns(IPriceOracle.UpdatePriceData memory priceData) 
+        returns(IPriceData.UpdatePriceData memory priceData) 
     {
-        // (,address updater,) = vm.readCallers();
+        return getUpdatePriceSignature(_tab, _price, _timestamp, block.chainid);
+    }
+
+    function getUpdatePriceSignature(
+        bytes3 _tab, 
+        uint256 _price, 
+        uint256 _timestamp,
+        uint256 _chainID
+    )
+        public  
+        returns(IPriceData.UpdatePriceData memory priceData) 
+    {
         updater = msg.sender;
         bytes32 structHash = keccak256(abi.encode(
-            _DATA_TYPEHASH, 
+            _DATA_TYPEHASH,
             authorizedAddr,
             updater,
+            _chainID,
             _tab,
             _price,
             _timestamp,
@@ -63,9 +76,10 @@ contract Signer is Test {
         ));
         bytes32 digest = MessageHashUtils.toTypedDataHash(_buildDomainSeparator(), structHash);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(priKey, digest);
-        priceData = IPriceOracle.UpdatePriceData(
+        priceData = IPriceData.UpdatePriceData(
             authorizedAddr,
             updater,
+            _chainID,
             _tab,
             _price,
             _timestamp,

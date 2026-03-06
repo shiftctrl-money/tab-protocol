@@ -21,14 +21,14 @@ interface IProtocolVault {
     )
         external;
 
-    function buyTab(address _reserveAddr, address _tabAddr, uint256 _reserveAmt) external returns (uint256);
+    function buyTab(address _reserveAddr, uint256 _reserveAmt, address _tabAddr, address _receiver) external returns (uint256);
 
-    function sellTab(address _reserveAddr, address _tabAddr, uint256 _tabAmt) external returns (uint256);
+    function sellTab(address _reserveAddr, address _tabAddr, uint256 _tabAmt, address _receiver) external returns (uint256);
 
     event UpdatedReserveSafe(address _valueFrom, address _valueTo);
     event InitCtrlAltDel(address reserveAddr, uint256 reserveAmt, address tabAddr, uint256 tabAmt, uint256 price);
-    event BuyTab(address indexed buyer, address reserveAddr, uint256 reserveAmt, address tabAddr, uint256 tabAmt);
-    event SellTab(address indexed seller, address reserveAddr, uint256 reserveAmt, address tabAddr, uint256 tabAmt);
+    event BuyTab(address indexed receiver, address reserveAddr, uint256 reserveAmt, address tabAddr, uint256 tabAmt);
+    event SellTab(address indexed receiver, address reserveAddr, uint256 reserveAmt, address tabAddr, uint256 tabAmt);
 
     error ExistedProtovolVault();
     error NotExistedProtocolVault();

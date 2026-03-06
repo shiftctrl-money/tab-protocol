@@ -51,7 +51,7 @@ interface IGovernanceAction {
         uint256 paymentAmtPerFeed,
         uint256 blockCountPerFeed,
         uint256 feedSize,
-        bytes32 whitelistedIPAddr
+        bytes32 whitelistedIpAddr
     )
         external;
 
@@ -61,7 +61,7 @@ interface IGovernanceAction {
         uint256 paymentAmtPerFeed,
         uint256 blockCountPerFeed,
         uint256 feedSize,
-        bytes32 whitelistedIPAddr
+        bytes32 whitelistedIpAddr
     )
         external;
 
@@ -101,7 +101,7 @@ interface IGovernanceAction {
         uint256 paymentAmtPerFeed,
         uint256 blockCountPerFeed,
         uint256 feedSize,
-        bytes32 whitelistedIPAddr
+        bytes32 whitelistedIpAddr
     );
     event ConfigPriceOracleProvider(
         address indexed provider,
@@ -109,7 +109,7 @@ interface IGovernanceAction {
         uint256 paymentAmtPerFeed,
         uint256 blockCountPerFeed,
         uint256 feedSize,
-        bytes32 whitelistedIPAddr
+        bytes32 whitelistedIpAddr
     );
     event RemovedPriceOracleProvider(address indexed _provider, uint256 blockNum, uint256 timestamp);
     event PausedPriceOracleProvider(address indexed _provider);

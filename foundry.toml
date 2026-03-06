@@ -7,6 +7,9 @@ test = "test"
 cache_path = "forge-cache"
 viaIR = true
 evm_version = "shanghai"
+optimizer = true
+optimizer_runs = 200
+no_storage_caching = true
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 

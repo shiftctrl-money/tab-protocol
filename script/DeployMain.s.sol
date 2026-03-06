@@ -115,7 +115,7 @@ contract DeployMain is Script {
 
         // CBBTC: reserve token
         if (cbBTCAddr == address(0)) { // testnet: deploy simulated CBBTC so protocol can mint reserve tokens
-            cbBTC = new CBBTC(owner);
+            cbBTC = new CBBTC(owner, "TestCBBTC", "CBBTC");
             cbBTCAddr = address(cbBTC);
             console.log("CBBTC deployed at:", cbBTCAddr);
         } else { // mainnet
@@ -212,7 +212,7 @@ contract DeployMain is Script {
         console.log("tabRegistry: ", address(tabRegistry));
 
         tabFactory = TabFactory(tabFactoryAddr); 
-        tabFactory.updateTabRegistry(address(tabRegistry));
+        tabFactory.updateCreator(address(tabRegistry));
         console.log("tabFactory: ", address(tabFactory));
         
         tabRegistry.setTabFactory(address(tabFactory));

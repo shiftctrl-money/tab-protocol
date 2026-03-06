@@ -11,9 +11,10 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
  * This is used on local or testnet.
  */
 contract CBBTC is ERC20, ERC20Burnable, Ownable {
-    constructor(address initialOwner)
-        ERC20("TestCBBTC", "CBBTC")
-        Ownable(initialOwner)
+    constructor(address initialOwner, string memory name, string memory symbol)
+        ERC20(name, symbol) 
+        Ownable(initialOwner) 
+        // ERC20("TestCBBTC", "CBBTC")
     {
         _mint(msg.sender, 100 * (10 ** decimals()));
     }

@@ -15,7 +15,7 @@ interface IPriceOracleManager {
         uint256 paymentAmtPerFeed;
         uint256 blockCountPerFeed;
         uint256 feedSize;
-        bytes32 whitelistedIPAddr;
+        bytes32 whitelistedIpAddr;
     }
 
     struct OracleProvider {
@@ -57,7 +57,7 @@ interface IPriceOracleManager {
         uint256 paymentAmtPerFeed,
         uint256 blockCountPerFeed,
         uint256 feedSize,
-        bytes32 whitelistedIPAddr
+        bytes32 whitelistedIpAddr
     )
         external;
 
@@ -67,7 +67,7 @@ interface IPriceOracleManager {
         uint256 paymentAmtPerFeed,
         uint256 blockCountPerFeed,
         uint256 feedSize,
-        bytes32 whitelistedIPAddr
+        bytes32 whitelistedIpAddr
     )
         external;
 
@@ -90,12 +90,12 @@ interface IPriceOracleManager {
 
 
     event UpdatedPriceOracleAddress(address _old, address _new);
-    event AdjustedSecondPerBlock(uint256 old_value, uint256 new_value);
+    event AdjustedSecondPerBlock(uint256 oldValue, uint256 newValue);
     event PriceConfigUpdated(
-        uint256 movementDelta_b4, 
-        uint256 movementDelta_after, 
-        uint256 inactivePeriod_b4, 
-        uint256 inactivePeriod_after
+        uint256 movementDeltaB4, 
+        uint256 movementDeltaAfter, 
+        uint256 inactivePeriodB4, 
+        uint256 inactivePeriodAfter
     );
     event NewPriceOracleProvider(
         uint256 blockNum,
@@ -105,7 +105,7 @@ interface IPriceOracleManager {
         uint256 paymentAmtPerFeed,
         uint256 blockCountPerFeed,
         uint256 feedSize,
-        bytes32 whitelistedIPAddr
+        bytes32 whitelistedIpAddr
     );
     event ConfigProvider(
         address indexed _provider,
@@ -113,7 +113,7 @@ interface IPriceOracleManager {
         uint256 paymentAmtPerFeed,
         uint256 blockCountPerFeed,
         uint256 feedSize,
-        bytes32 whitelistedIPAddr
+        bytes32 whitelistedIpAddr
     );
     event ResetTracker(
         address indexed provider,
@@ -129,7 +129,7 @@ interface IPriceOracleManager {
     event GiveUpPayment(address indexed provider, uint256 amt);
     event WithdrewPayment(address indexed provider, uint256 amt);
     event MissedFeed(address indexed provider, uint256 missedCount, uint256 totalMissedCount);
-    event PaymentReady(address indexed provider, uint256 added, uint256 totalOS);
+    event PaymentReady(address indexed provider, uint256 added, uint256 totalOs);
     
     error ZeroAddress();
     error ZeroValue();

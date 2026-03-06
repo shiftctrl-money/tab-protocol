@@ -2,19 +2,18 @@
 pragma solidity 0.8.28;
 
 import {console} from "forge-std/console.sol";
-import {Deployer} from "./Deployer.t.sol";
+import {UniDeployer} from "./UniDeployer.t.sol";
 import {IConfig} from "../contracts/interfaces/IConfig.sol";
 
-contract ConfigTest is Deployer {
+contract ConfigTest is UniDeployer {
 
     function setUp() public {
         deploy();
     }
 
     function test_permission() public {
-        assertEq(config.defaultAdmin() , address(governanceTimelockController));
-        assertEq(config.hasRole(MAINTAINER_ROLE, address(governanceTimelockController)), true);
-        assertEq(config.hasRole(MAINTAINER_ROLE, address(emergencyTimelockController)), true);
+        assertEq(config.defaultAdmin() , address(zUniGovernance));
+        assertEq(config.hasRole(MAINTAINER_ROLE, address(zUniGovernance)), true);
         assertEq(config.hasRole(MAINTAINER_ROLE, address(governanceAction)), true);
         assertEq(config.hasRole(MAINTAINER_ROLE, owner), false);
         assertEq(config.hasRole(MAINTAINER_ROLE, address(tabRegistry)), true);
@@ -22,7 +21,7 @@ contract ConfigTest is Deployer {
         vm.expectRevert();
         config.beginDefaultAdminTransfer(owner);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         config.beginDefaultAdminTransfer(owner);
         nextBlock(1 days + 1);
         vm.stopPrank();
@@ -54,7 +53,7 @@ contract ConfigTest is Deployer {
         vm.expectRevert(); // unauthorized
         config.setVaultKeeperAddress(owner);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         
         vm.expectRevert(IConfig.ZeroAddress.selector);
         config.setVaultKeeperAddress(address(0));
@@ -73,7 +72,7 @@ contract ConfigTest is Deployer {
         vm.expectRevert(); // unauthorized
         config.setTreasuryAddress(owner);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         
         vm.expectRevert(IConfig.ZeroAddress.selector);
         config.setTreasuryAddress(address(0));
@@ -90,7 +89,7 @@ contract ConfigTest is Deployer {
         vm.expectRevert(); // unauthorized
         config.setDefTabParams(usd);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vm.expectEmit();
         emit IConfig.DefaultTabParams(usd, 150, 0, 180, 120);
         config.setDefTabParams(usd);
@@ -137,7 +136,7 @@ contract ConfigTest is Deployer {
         vm.expectRevert(); // unauthorized
         config.setTabParams(tabs, tabParams);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
 
         IConfig.TabParams[] memory singleTabParams = new IConfig.TabParams[](1);
         vm.expectRevert(IConfig.InvalidArrayLength.selector);
@@ -169,7 +168,7 @@ contract ConfigTest is Deployer {
         vm.expectRevert(); // unauthorized
         config.setAuctionParams(value, value, value, owner);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
 
         vm.expectRevert(IConfig.ZeroValue.selector);
         config.setAuctionParams(0, value, value, owner);

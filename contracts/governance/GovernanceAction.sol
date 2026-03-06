@@ -174,7 +174,7 @@ contract GovernanceAction is
      * @param blockCountPerFeed Assume 5-min feed interval and 2s block gen. time
      * Each feed is expected to arrive within 60/2 * 5 = 150 blocks.
      * @param feedSize Minimum number of currency pairs sent by provider.
-     * @param whitelistedIPAddr Comma separated IP Address(es). Max 2 IP when IP is full length (15*2). Price feeds are
+     * @param whitelistedIpAddr Comma separated IP Address(es). Max 2 IP when IP is full length (15*2). Price feeds are
      * expected to send from these IP.
      */
     function addPriceOracleProvider(
@@ -183,7 +183,7 @@ contract GovernanceAction is
         uint256 paymentAmtPerFeed,
         uint256 blockCountPerFeed,
         uint256 feedSize,
-        bytes32 whitelistedIPAddr
+        bytes32 whitelistedIpAddr
     )
         external
         onlyRole(MAINTAINER_ROLE)
@@ -196,7 +196,7 @@ contract GovernanceAction is
             paymentAmtPerFeed,
             blockCountPerFeed,
             feedSize,
-            whitelistedIPAddr
+            whitelistedIpAddr
         );
         emit NewPriceOracleProvider(
             block.number,
@@ -206,7 +206,7 @@ contract GovernanceAction is
             paymentAmtPerFeed,
             blockCountPerFeed,
             feedSize,
-            whitelistedIPAddr
+            whitelistedIpAddr
         );
     }
 
@@ -216,16 +216,16 @@ contract GovernanceAction is
         uint256 paymentAmtPerFeed,
         uint256 blockCountPerFeed,
         uint256 feedSize,
-        bytes32 whitelistedIPAddr
+        bytes32 whitelistedIpAddr
     )
         external
         onlyRole(MAINTAINER_ROLE)
     {
         IPriceOracleManager(priceOracleManagerAddress).configureProvider(
-            provider, paymentTokenAddress, paymentAmtPerFeed, blockCountPerFeed, feedSize, whitelistedIPAddr
+            provider, paymentTokenAddress, paymentAmtPerFeed, blockCountPerFeed, feedSize, whitelistedIpAddr
         );
         emit ConfigPriceOracleProvider(
-            provider, paymentTokenAddress, paymentAmtPerFeed, blockCountPerFeed, feedSize, whitelistedIPAddr
+            provider, paymentTokenAddress, paymentAmtPerFeed, blockCountPerFeed, feedSize, whitelistedIpAddr
         );
     }
 

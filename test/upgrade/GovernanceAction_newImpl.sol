@@ -6,7 +6,7 @@ import {GovernanceAction} from "../../contracts/governance/GovernanceAction.sol"
 contract GovernanceAction_newImpl is GovernanceAction {
     string public version;
 
-    function upgraded(string calldata _version) external onlyRole(UPGRADER_ROLE) {
+    function upgraded(string calldata _version) reinitializer(2) external onlyRole(UPGRADER_ROLE) {
         version = _version;
     }
 

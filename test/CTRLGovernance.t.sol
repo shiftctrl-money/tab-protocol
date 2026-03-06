@@ -2,11 +2,12 @@
 pragma solidity 0.8.28;
 
 import {console} from "forge-std/console.sol";
-import {Deployer} from "./Deployer.t.sol";
+import {UniDeployer} from "./UniDeployer.t.sol";
 import {IGovernor} from "@openzeppelin/contracts/governance/IGovernor.sol";
 import {CBBTC} from "../contracts/token/CBBTC.sol";
+import {CTRL_newImpl} from "./upgrade/CTRL_newImpl.sol";
 
-contract CTRLGovernanceTest is Deployer {
+contract CTRLGovernanceTest is UniDeployer {
 
     function setUp() public {
         deploy();
@@ -14,6 +15,24 @@ contract CTRLGovernanceTest is Deployer {
         nextBlock(1 days + 1);
         vm.startPrank(address(governanceTimelockController));
         ctrl.acceptDefaultAdminTransfer();
+        vm.stopPrank();
+    }
+
+    function testUpgrade() public {
+        CTRL_newImpl v2 = new CTRL_newImpl();
+        vm.startPrank(owner);
+        ctrl.upgradeToAndCall(
+            address(v2),
+            abi.encodeWithSignature("upgraded(string)", "CTRL_v2")
+        );
+        
+        CTRL_newImpl newCtrl = CTRL_newImpl(address(ctrl));
+        assertEq(keccak256(bytes(newCtrl.version())), keccak256("CTRL_v2"));
+        assertEq(newCtrl.newFunction(), 1e18);
+
+        vm.expectRevert();
+        newCtrl.upgraded("test");
+
         vm.stopPrank();
     }
 
@@ -112,7 +131,7 @@ contract CTRLGovernanceTest is Deployer {
         assertEq(shiftCtrlGovernor.proposalThreshold(), 123e18);
         assertEq(shiftCtrlGovernor.quorumNumerator(), 50);
         assertEq(shiftCtrlGovernor.quorumDenominator(), 100);
-        assertEq(tabRegistry.activatedTabCount(), 1);
+        assertEq(tabRegistry.activatedTabCount(), 3);
     }
 
     /**
@@ -153,7 +172,7 @@ contract CTRLGovernanceTest is Deployer {
         bytes32 description = keccak256(bytes("test"));
 
         address addr = address(shiftCtrlEmergencyGovernor);
-        address newReserve = address(new CBBTC(owner));
+        address newReserve = address(new CBBTC(owner, "TestCBBTC", "CBBTC"));
         assertEq(reserveRegistry.isEnabledReserve(newReserve), address(0));
         targets[0] = addr;
         targets[1] = addr;

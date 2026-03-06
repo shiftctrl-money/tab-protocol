@@ -2,12 +2,12 @@
 pragma solidity 0.8.28;
 
 import {console} from "forge-std/console.sol";
-import {Deployer} from "./Deployer.t.sol";
+import {UniDeployer} from "./UniDeployer.t.sol";
 import {CBBTC} from "../contracts/token/CBBTC.sol";
 import {TabERC20} from "../contracts/token/TabERC20.sol";
 import {IAuctionManager} from "../contracts/interfaces/IAuctionManager.sol";
 
-contract PeggedTab is Deployer {
+contract PeggedTab is UniDeployer {
 
     function setUp() public {
         deploy();
@@ -42,7 +42,7 @@ contract PeggedTab is Deployer {
         assertEq(priceOracle.getPrice(sUSD), 120000e18);
 
         priceData = signer.getUpdatePriceSignature(sPEG, 60000e18, block.timestamp);
-        vaultManager.withdrawReserve(1, 1e17, priceData);
+        vaultManager.withdrawReserve(1, 1e17, msg.sender, priceData);
 
         cbBTC.approve(address(vaultManager), 1e7);
         vaultManager.depositReserve(deployer, 1, 1e7);
@@ -51,7 +51,7 @@ contract PeggedTab is Deployer {
         vaultManager.paybackTab(deployer, 2, 5000e18);
 
         priceData = signer.getUpdatePriceSignature(sPEG, 60000e18, block.timestamp);
-        vaultManager.withdrawTab(2, 6666e18, priceData);
+        vaultManager.withdrawTab(2, 6666e18, msg.sender, priceData);
 
         priceData = signer.getUpdatePriceSignature(sUSD, 10000e18, block.timestamp);
         vm.startPrank(address(vaultKeeper));

@@ -112,13 +112,15 @@ contract ProtocolVault is
      * 
      * @dev Mint Tabs. Required caller's allowance BTC token.
      * @param _reserveAddr Reserve contract address.
-     * @param _tabAddr Tab contract address.
      * @param _reserveAmt Reserve amount to spend to buy Tab.
+     * @param _tabAddr Tab contract address.
+     * @param _receiver Address to receive minted Tab.
      */
     function buyTab(
         address _reserveAddr, 
+        uint256 _reserveAmt,
         address _tabAddr, 
-        uint256 _reserveAmt
+        address _receiver
     ) 
         external 
         nonReentrant 
@@ -143,8 +145,8 @@ contract ProtocolVault is
         vault.reserveAmt += _reserveAmt;
         vault.tabAmt += tabAmt;
 
-        ITabERC20(vault.tab).mint(_msgSender(), tabAmt);
-        emit BuyTab(_msgSender(), _reserveAddr, _reserveAmt, _tabAddr, tabAmt);
+        ITabERC20(vault.tab).mint(_receiver, tabAmt);
+        emit BuyTab(_receiver, _reserveAddr, _reserveAmt, _tabAddr, tabAmt);
         return tabAmt;
     }
 
@@ -154,11 +156,13 @@ contract ProtocolVault is
      * @param _reserveAddr Reserve contract address.
      * @param _tabAddr Tab contract address.
      * @param _tabAmt Tab amount to spend to get BTC token.
+     * @param _receiver Address to receive BTC token.
      */
     function sellTab(
         address _reserveAddr, 
         address _tabAddr, 
-        uint256 _tabAmt
+        uint256 _tabAmt,
+        address _receiver
     )
         external 
         nonReentrant 
@@ -184,11 +188,11 @@ contract ProtocolVault is
         // From protocol vault, send BTC token to caller
         SafeERC20.safeTransfer(
             IERC20(_reserveAddr),
-            _msgSender(),
+            _receiver,
             IReserveSafe(reserveSafe).getNativeTransferAmount(_reserveAddr, reserveAmt)
         );
 
-        emit SellTab(_msgSender(), _reserveAddr, reserveAmt, _tabAddr, _tabAmt);
+        emit SellTab(_receiver, _reserveAddr, reserveAmt, _tabAddr, _tabAmt);
         return reserveAmt;
     }
 

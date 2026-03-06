@@ -18,9 +18,12 @@
   "devDependencies": {
     "@openzeppelin/contracts": "^5.1.0",
     "@openzeppelin/contracts-upgradeable": "^5.1.0",
+    "@zetachain/protocol-contracts": "13.0.0",
+    "@zetachain/standard-contracts": "2.0.1",
     "ethers": "^6.13.4"
   },
   "dependencies": {
+    "@zetachain/toolkit": "^16.0.1",
     "forge-std": "github:foundry-rs/forge-std#v1.9.4"
   },
   "bugs": {

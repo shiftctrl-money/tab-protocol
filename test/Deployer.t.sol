@@ -17,6 +17,7 @@ import {ShiftCTRLEmergencyGovernor} from "../contracts/governance/ShiftCTRLEmerg
 import {GovernanceAction} from "../contracts/governance/GovernanceAction.sol";
 import {PriceOracle} from "../contracts/oracle/PriceOracle.sol";
 import {IPriceOracle} from "../contracts/interfaces/IPriceOracle.sol";
+import {IPriceData} from "../contracts/interfaces/IUniTabOperation.sol";
 import {IPriceOracleManager} from "../contracts/interfaces/IPriceOracleManager.sol";
 import {PriceOracleManager} from "../contracts/oracle/PriceOracleManager.sol";
 import {ReserveSafe} from "../contracts/reserve/ReserveSafe.sol";
@@ -42,6 +43,7 @@ interface ICBBTC {
     function configureMinter(address,uint256) external returns (bool);
 }
 
+// Obsolete: replaced by UniDeployer.t.sol
 abstract contract Deployer is Test {
 
     bytes32 public constant TIMELOCK_ADMIN_ROLE = keccak256("TIMELOCK_ADMIN_ROLE");
@@ -87,7 +89,7 @@ abstract contract Deployer is Test {
     ProtocolVault protocolVault;
     Signer signer;
 
-    IPriceOracle.UpdatePriceData priceData;
+    IPriceData.UpdatePriceData priceData;
 
     constructor() {
         owner = address(this);
@@ -245,7 +247,7 @@ abstract contract Deployer is Test {
             
             // Deploy reserve token: cbBTC
             // Simulate mainnet 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf
-            cbBTC = new CBBTC(owner);
+            cbBTC = new CBBTC(owner, "TestCBBTC", "CBBTC");
             console.log("cbBTC: ", address(cbBTC));
 
             // Deploy governance token: CTRL
@@ -350,7 +352,7 @@ abstract contract Deployer is Test {
             //     abi.encodePacked(type(TabFactory).creationCode, abi.encode(address(tabERC20), governanceTimelockController))
             // );
             tabFactory = new TabFactory(address(tabERC20), owner); 
-            tabFactory.updateTabRegistry(address(tabRegistry));
+            tabFactory.updateCreator(address(tabRegistry));
             console.log("tabFactory: ", address(tabFactory));
             
             tabRegistry.setTabFactory(address(tabFactory));

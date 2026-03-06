@@ -2,12 +2,12 @@
 pragma solidity 0.8.28;
 
 import {console} from "forge-std/console.sol";
-import {Deployer} from "./Deployer.t.sol";
+import {UniDeployer} from "./UniDeployer.t.sol";
 import {IConfig} from "../contracts/interfaces/IConfig.sol";
 import {ITabRegistry} from "../contracts/interfaces/ITabRegistry.sol";
 import {TabERC20} from "../contracts/token/TabERC20.sol";
 
-contract TabRegistryTest is Deployer {
+contract TabRegistryTest is UniDeployer {
     bytes32 public constant USER_ROLE = keccak256("USER_ROLE");
     bytes32 public constant TAB_PAUSER_ROLE = keccak256("TAB_PAUSER_ROLE");
     bytes32 public constant ALL_TAB_PAUSER_ROLE = keccak256("ALL_TAB_PAUSER_ROLE");
@@ -17,26 +17,26 @@ contract TabRegistryTest is Deployer {
     }
 
     function test_permission() public {
-        assertEq(tabRegistry.defaultAdmin() , address(governanceTimelockController));
+        assertEq(tabRegistry.defaultAdmin() , address(zUniGovernance));
 
-        assertEq(tabRegistry.hasRole(USER_ROLE, address(governanceTimelockController)), true);
-        assertEq(tabRegistry.hasRole(USER_ROLE, address(emergencyTimelockController)), true);
-        assertEq(tabRegistry.hasRole(USER_ROLE, address(governanceAction)), true);
+        assertEq(tabRegistry.hasRole(USER_ROLE, address(zUniGovernance)), true);
+        // assertEq(tabRegistry.hasRole(USER_ROLE, address(emergencyTimelockController)), true);
+        // assertEq(tabRegistry.hasRole(USER_ROLE, address(governanceAction)), true);
         assertEq(tabRegistry.hasRole(USER_ROLE, address(vaultManager)), true);
 
-        assertEq(tabRegistry.hasRole(MAINTAINER_ROLE, address(governanceTimelockController)), true);
-        assertEq(tabRegistry.hasRole(MAINTAINER_ROLE, address(emergencyTimelockController)), true);
-        assertEq(tabRegistry.hasRole(MAINTAINER_ROLE, address(governanceAction)), true);
+        assertEq(tabRegistry.hasRole(MAINTAINER_ROLE, address(zUniGovernance)), true);
+        // assertEq(tabRegistry.hasRole(MAINTAINER_ROLE, address(emergencyTimelockController)), true);
+        // assertEq(tabRegistry.hasRole(MAINTAINER_ROLE, address(governanceAction)), true);
         assertEq(tabRegistry.hasRole(MAINTAINER_ROLE, owner), false);
 
-        assertEq(tabRegistry.hasRole(TAB_PAUSER_ROLE, address(governanceTimelockController)), true);
-        assertEq(tabRegistry.hasRole(TAB_PAUSER_ROLE, address(emergencyTimelockController)), true);
-        assertEq(tabRegistry.hasRole(TAB_PAUSER_ROLE, address(governanceAction)), true);
+        assertEq(tabRegistry.hasRole(TAB_PAUSER_ROLE, address(zUniGovernance)), true);
+        // assertEq(tabRegistry.hasRole(TAB_PAUSER_ROLE, address(emergencyTimelockController)), true);
+        // assertEq(tabRegistry.hasRole(TAB_PAUSER_ROLE, address(governanceAction)), true);
         assertEq(tabRegistry.hasRole(TAB_PAUSER_ROLE, tabRegistryFreezerAddr), true);
 
-        assertEq(tabRegistry.hasRole(ALL_TAB_PAUSER_ROLE, address(governanceTimelockController)), true);
-        assertEq(tabRegistry.hasRole(ALL_TAB_PAUSER_ROLE, address(emergencyTimelockController)), true);
-        assertEq(tabRegistry.hasRole(ALL_TAB_PAUSER_ROLE, address(governanceAction)), true);
+        assertEq(tabRegistry.hasRole(ALL_TAB_PAUSER_ROLE, address(zUniGovernance)), true);
+        // assertEq(tabRegistry.hasRole(ALL_TAB_PAUSER_ROLE, address(emergencyTimelockController)), true);
+        // assertEq(tabRegistry.hasRole(ALL_TAB_PAUSER_ROLE, address(governanceAction)), true);
 
         assertEq(tabRegistry.getRoleAdmin(USER_ROLE), MAINTAINER_ROLE);
         assertEq(tabRegistry.getRoleAdmin(TAB_PAUSER_ROLE), MAINTAINER_ROLE);
@@ -46,7 +46,7 @@ contract TabRegistryTest is Deployer {
         vm.expectRevert();
         tabRegistry.beginDefaultAdminTransfer(owner);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         tabRegistry.beginDefaultAdminTransfer(owner);
         nextBlock(1 days + 1);
         vm.stopPrank();
@@ -61,7 +61,7 @@ contract TabRegistryTest is Deployer {
         vm.expectRevert(); // unauthorized
         tabRegistry.setTabFactory(owner);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vm.expectRevert(ITabRegistry.ZeroAddress.selector);
         tabRegistry.setTabFactory(address(0));
 
@@ -75,7 +75,7 @@ contract TabRegistryTest is Deployer {
         vm.expectRevert(); // unauthorized
         tabRegistry.setVaultManagerAddress(owner);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vm.expectRevert(ITabRegistry.ZeroAddress.selector);
         tabRegistry.setVaultManagerAddress(address(0));
 
@@ -89,7 +89,7 @@ contract TabRegistryTest is Deployer {
         vm.expectRevert(); // unauthorized
         tabRegistry.setConfigAddress(owner);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vm.expectRevert(ITabRegistry.ZeroAddress.selector);
         tabRegistry.setConfigAddress(address(0));
 
@@ -103,7 +103,7 @@ contract TabRegistryTest is Deployer {
         vm.expectRevert(); // unauthorized
         tabRegistry.setPriceOracleManagerAddress(owner);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vm.expectRevert(ITabRegistry.ZeroAddress.selector);
         tabRegistry.setPriceOracleManagerAddress(address(0));
         
@@ -114,12 +114,12 @@ contract TabRegistryTest is Deployer {
     }
 
     function test_setGovernanceAction() public {
-        vm.startPrank(address(emergencyTimelockController));
+        vm.startPrank(address(123));
         vm.expectRevert(); // unauthorized
         tabRegistry.setGovernanceAction(owner);
         vm.stopPrank();
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vm.expectRevert(ITabRegistry.ZeroAddress.selector);
         tabRegistry.setGovernanceAction(address(0));
 
@@ -138,7 +138,7 @@ contract TabRegistryTest is Deployer {
         vm.expectRevert(); // unauthorized
         tabRegistry.setProtocolVaultAddress(owner);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vm.expectRevert(ITabRegistry.ZeroAddress.selector);
         tabRegistry.setProtocolVaultAddress(address(0));
 
@@ -159,7 +159,7 @@ contract TabRegistryTest is Deployer {
         bytes3 usd = bytes3(abi.encodePacked("USD"));
         bytes32 usd32 = tabRegistry.tabCodeToTabKey(usd);
         TabERC20 sUSD = TabERC20(createTab(usd));
-        assertEq(tabRegistry.activatedTabCount(), 1);
+        assertEq(tabRegistry.activatedTabCount(), 3);
         assertEq(tabRegistry.tabs(usd32), address(sUSD));
 
         vm.startPrank(eoa_accounts[5]);
@@ -183,7 +183,7 @@ contract TabRegistryTest is Deployer {
         emit ITabRegistry.FreezeTab(usd);        
         tabRegistry.disableTab(usd);
         assertEq(tabRegistry.frozenTabs(usd32), true);
-        assertEq(tabRegistry.activatedTabCount(), 1);
+        assertEq(tabRegistry.activatedTabCount(), 3);
 
         vm.expectEmit();
         emit ITabRegistry.UnfreezeTab(usd);
@@ -202,10 +202,10 @@ contract TabRegistryTest is Deployer {
         bytes3 aud = bytes3(abi.encodePacked("AUD"));
         bytes32 aud32 = tabRegistry.tabCodeToTabKey(aud);
         createTab(aud);
-        assertEq(tabRegistry.activatedTabCount(), 3);
+        assertEq(tabRegistry.activatedTabCount(), 4);
         assertEq(keccak256(abi.encodePacked(tabRegistry.tabList(0))), keccak256(abi.encodePacked(usd)));
-        assertEq(keccak256(abi.encodePacked(tabRegistry.tabList(1))), keccak256(abi.encodePacked(jpy)));
-        assertEq(keccak256(abi.encodePacked(tabRegistry.tabList(2))), keccak256(abi.encodePacked(aud)));
+        assertEq(keccak256(abi.encodePacked(tabRegistry.tabList(1))), keccak256(abi.encodePacked(aud)));
+        assertEq(keccak256(abi.encodePacked(tabRegistry.tabList(3))), keccak256(abi.encodePacked(jpy)));
         
         vm.startPrank(eoa_accounts[5]);
         vm.expectRevert(); // unauthorized
@@ -221,7 +221,7 @@ contract TabRegistryTest is Deployer {
         assertEq(tabRegistry.frozenTabs(usd32), true);
         assertEq(tabRegistry.frozenTabs(jpy32), true);
         assertEq(tabRegistry.frozenTabs(aud32), true);
-        assertEq(tabRegistry.activatedTabCount(), 3);
+        assertEq(tabRegistry.activatedTabCount(), 4);
         
         vm.expectEmit();
         emit ITabRegistry.UnfreezeAllTab();
@@ -233,10 +233,11 @@ contract TabRegistryTest is Deployer {
     }
 
     function test_createTab() public {
-        bytes3 usd = bytes3(abi.encodePacked("USD"));
+        bytes3 hkd = bytes3(abi.encodePacked("HKD"));
 
+        vm.startPrank(address(444));
         vm.expectRevert(); // unauthorized
-        tabRegistry.createTab(usd);
+        tabRegistry.createTab(hkd);
 
         vm.startPrank(address(vaultManager));
         vm.expectRevert(ITabRegistry.EmptyCharacter.selector);
@@ -247,30 +248,28 @@ contract TabRegistryTest is Deployer {
         tabRegistry.createTab(0x444500);
         
         vm.expectEmit(true, false, false, false);
-        emit ITabRegistry.TabRegistryAdded("sUSD", owner);
-        address addr = tabRegistry.createTab(usd);
+        emit ITabRegistry.TabRegistryAdded("sHKD", owner);
+        address addr = tabRegistry.createTab(hkd);
 
-        TabERC20 sUSD = TabERC20(addr);
-        assertEq(sUSD.tabKey(), keccak256(abi.encodePacked("USD")));
-        assertEq(sUSD.name(), string(abi.encodePacked("Sound USD")));
-        assertEq(sUSD.symbol(), "sUSD");
-        assertEq(sUSD.decimals(), 18);
-        assertEq(sUSD.totalSupply(), 0);
-        assertEq(sUSD.balanceOf(owner), 0);
-        assertEq(tabRegistry.activatedTabCount(), 1);
-        assertEq(keccak256(abi.encodePacked(tabRegistry.tabList(0))), keccak256(abi.encodePacked(usd)));
+        TabERC20 sHKD = TabERC20(addr);
+        assertEq(sHKD.tabKey(), keccak256(abi.encodePacked("HKD")));
+        assertEq(sHKD.name(), string(abi.encodePacked("Sound HKD")));
+        assertEq(sHKD.symbol(), "sHKD");
+        assertEq(sHKD.decimals(), 18);
+        assertEq(sHKD.totalSupply(), 0);
+        assertEq(sHKD.balanceOf(owner), 0);
+        assertEq(tabRegistry.activatedTabCount(), 4);
+        assertEq(keccak256(abi.encodePacked(tabRegistry.tabList(3))), keccak256(abi.encodePacked(hkd)));
 
-        IConfig.TabParams memory tabParams = config.getTabParams(usd);
+        IConfig.TabParams memory tabParams = config.getTabParams(hkd);
         IConfig.TabParams memory defTabParams = config.getTabParams(0x00);
         assertEq(tabParams.riskPenaltyPerFrame, defTabParams.riskPenaltyPerFrame);
         assertEq(tabParams.processFeeRate, defTabParams.processFeeRate);
         assertEq(tabParams.minReserveRatio, defTabParams.minReserveRatio);
         assertEq(tabParams.liquidationRatio, defTabParams.liquidationRatio);
 
-        address addr2 = tabRegistry.createTab(usd); // retrieve address once tab is created already
+        address addr2 = tabRegistry.createTab(hkd); // retrieve address once tab is created already
         assertEq(addr, addr2);
-
-        vm.stopPrank();
     }
 
     function test_getTabAddress_tabCodeToTabKey() public {

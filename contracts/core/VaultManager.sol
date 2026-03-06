@@ -11,6 +11,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IConfig} from "../interfaces/IConfig.sol";
 import {ITabRegistry} from "../interfaces/ITabRegistry.sol";
 import {IPriceOracle} from "../interfaces/IPriceOracle.sol";
+import {IPriceData} from "../interfaces/IUniTabOperation.sol";
 import {IVaultKeeper} from "../interfaces/IVaultKeeper.sol";
 import {IReserveRegistry} from "../interfaces/IReserveRegistry.sol";
 import {ITabERC20} from "../interfaces/ITabERC20.sol";
@@ -153,9 +154,10 @@ contract VaultManager is
         address _reserveAddr, 
         uint256 _reserveAmt, 
         uint256 _tabAmt, 
-        IPriceOracle.UpdatePriceData calldata sigPrice
+        IPriceData.UpdatePriceData calldata sigPrice
     ) 
         external 
+        returns(address) 
     {
         if (_reserveAddr == address(0))
             revert ZeroAddress();
@@ -170,10 +172,14 @@ contract VaultManager is
         if (tabRegistry.frozenTabs(tabKey))
             revert DisabledTab(sigPrice.tab);
 
+        // When operate on ZetaChain: _msgSender() == sigPrice.updater
+        // When operate cross-chain:  _msgSender() == Universal contract (e.g. ZUniCreateVault)
+        address receiver = _msgSender() == sigPrice.updater? sigPrice.updater: _msgSender();
+
         // Required allowance on reserve token, transfer reserve to Safe
         SafeERC20.safeTransferFrom(
             IERC20(_reserveAddr), 
-            sigPrice.updater, 
+            receiver, 
             reserveSafe, 
             IReserveSafe(reserveSafe).getNativeTransferAmount(_reserveAddr, _reserveAmt)
         );
@@ -197,10 +203,11 @@ contract VaultManager is
             ownerList.push(sigPrice.updater);
 
         vaultOwners[sigPrice.updater].push(vaultId);
-        vaults[sigPrice.updater][vaultId] = Vault(_reserveAddr, _reserveAmt, tabAddr, _tabAmt, 0, 0);
-        ITabERC20(tabAddr).mint(sigPrice.updater, _tabAmt);
+        vaults[sigPrice.updater][vaultId] = Vault(sigPrice.chainID, _reserveAddr, _reserveAmt, tabAddr, _tabAmt, 0, 0);
+        ITabERC20(tabAddr).mint(receiver, _tabAmt);
 
         emit NewVault(sigPrice.updater, vaultId, _reserveAddr, _reserveAmt, tabAddr, _tabAmt);
+        return tabAddr;
     }
 
     /**
@@ -212,7 +219,8 @@ contract VaultManager is
     function withdrawTab(
         uint256 _vaultId, 
         uint256 _tabAmt, 
-        IPriceOracle.UpdatePriceData calldata sigPrice
+        address _receiver,
+        IPriceData.UpdatePriceData calldata sigPrice
     ) 
         external 
     {
@@ -228,8 +236,10 @@ contract VaultManager is
             revert CtrlAltDelTab(sigPrice.tab);
 
         Vault storage v = vaults[sigPrice.updater][_vaultId];
-        if(v.reserveAmt == 0)
+        if(v.reserveAmt == 0 || v.chainID != sigPrice.chainID)
             revert InvalidVault(sigPrice.updater, _vaultId);
+        if (_receiver == address(0))
+            _receiver = sigPrice.updater;
         
         vaultKeeper.pushVaultRiskPenalty(sigPrice.updater, _vaultId);
 
@@ -254,9 +264,9 @@ contract VaultManager is
         v.tabAmt += _tabAmt;
         v.osTabAmt += chargedFee;
         v.pendingOsMint += chargedFee;
-        ITabERC20(v.tab).mint(sigPrice.updater, _tabAmt);
+        ITabERC20(v.tab).mint(_receiver, _tabAmt);
 
-        emit TabWithdraw(sigPrice.updater, _vaultId, _tabAmt, v.tabAmt);
+        emit TabWithdraw(sigPrice.updater, _vaultId, _receiver, _tabAmt, v.tabAmt);
     }
 
     /**
@@ -308,7 +318,7 @@ contract VaultManager is
 
         uint256 amtToBurn = _tabAmt >= treasuryAmt ? (_tabAmt - treasuryAmt) : 0;
         if (amtToBurn > 0)
-            ITabERC20(v.tab).burnFrom(_vaultOwner, amtToBurn);
+            ITabERC20(v.tab).burnFrom((_msgSender() == _vaultOwner? _vaultOwner: _msgSender()), amtToBurn);
 
         emit TabReturned(_vaultOwner, _vaultId, _tabAmt, v.tabAmt);
     }
@@ -317,20 +327,24 @@ contract VaultManager is
      * @dev Withdraw BTC reserve from vault. Be careful on vault reserve ratio post withdrawal.
      * @param _vaultId Vault ID.
      * @param _reserveAmt Withdrawal amount.
+     * @param _receiver Address to receive the withdrawn reserve.
      * @param sigPrice Signed Tab rate by authorized oracle service.
      */
     function withdrawReserve(
         uint256 _vaultId, 
         uint256 _reserveAmt, 
-        IPriceOracle.UpdatePriceData calldata sigPrice
+        address _receiver,
+        IPriceData.UpdatePriceData calldata sigPrice
     ) 
         external 
     {
         if (_reserveAmt == 0)
             revert ZeroValue();
+        if (_receiver == address(0))
+            _receiver = sigPrice.updater;
 
         Vault storage v = vaults[sigPrice.updater][_vaultId];
-        if (v.reserveAmt == 0)
+        if (v.reserveAmt == 0 || v.chainID != sigPrice.chainID)
             revert InvalidVault(sigPrice.updater, _vaultId);
         if (_reserveAmt > v.reserveAmt)
             revert ExcessAmount();
@@ -368,8 +382,8 @@ contract VaultManager is
             v.osTabAmt += chargedFee;
             v.pendingOsMint += chargedFee;
         }
-        IReserveSafe(reserveSafe).unlockReserve(v.reserveAddr, sigPrice.updater, _reserveAmt);
-        emit ReserveWithdraw(sigPrice.updater, _vaultId, _reserveAmt, v.reserveAmt);
+        IReserveSafe(reserveSafe).unlockReserve(v.reserveAddr, _receiver, _reserveAmt);
+        emit ReserveWithdraw(sigPrice.updater, _receiver, _vaultId, _reserveAmt, v.reserveAmt);
     }
 
     /**
@@ -411,7 +425,7 @@ contract VaultManager is
         // Required approve(allowance)
         SafeERC20.safeTransferFrom(
             IERC20(v.reserveAddr), 
-            _vaultOwner, 
+            (_msgSender() == _vaultOwner? _vaultOwner: _msgSender()), 
             reserveSafe, 
             IReserveSafe(reserveSafe).getNativeTransferAmount(v.reserveAddr, _reserveAmt)
         );
@@ -459,13 +473,13 @@ contract VaultManager is
     function liquidateVault(
         uint256 _vaultId,
         uint256 _osRiskPenalty,
-        IPriceOracle.UpdatePriceData calldata sigPrice
+        IPriceData.UpdatePriceData calldata sigPrice
     )
         external
         onlyRole(KEEPER_ROLE)
     {
         Vault storage v = vaults[sigPrice.updater][_vaultId];
-        if (v.tabAmt == 0)
+        if (v.tabAmt == 0 || v.chainID != sigPrice.chainID)
             revert InvalidVault(sigPrice.updater, _vaultId);
 
         v.osTabAmt += _osRiskPenalty;
@@ -543,34 +557,34 @@ contract VaultManager is
                     // update risk penalty value (if any)
                     vaultKeeper.pushVaultRiskPenalty(ownerList[i], ownerVaultIds[n]);
 
-                    uint256 totalOS = v.tabAmt + v.osTabAmt;
+                    uint256 totalOs = v.tabAmt + v.osTabAmt;
 
                     // Revert if any vault breaches liquidation ratio with supplied _btcTabRate
                     if (vaultKeeper.isLiquidatingVault(
                         _tab, 
                         _reserveValue(_btcTabRate, v.reserveAmt), 
-                        totalOS
+                        totalOs
                     )) {
                         revert LiquidatingVault(ownerList[i], ownerVaultIds[n]);
                     }
 
                     // Calc. reserve amount based on reserve type
-                    uint256 vaultReserve = Math.mulDiv(totalOS, 1e18, _btcTabRate);
+                    uint256 vaultReserve = Math.mulDiv(totalOs, 1e18, _btcTabRate);
 
                     int256 idx = findMatchedAddr(addrs, v.reserveAddr);
                     if (idx < 0) {
                         data.uniqReserveCount = data.uniqReserveCount + 1;
                         addrs[uint256(data.uniqReserveCount)] = v.reserveAddr;
                         reserves[uint256(data.uniqReserveCount)] = vaultReserve;
-                        tabAmts[uint256(data.uniqReserveCount)] += totalOS;
+                        tabAmts[uint256(data.uniqReserveCount)] += totalOs;
                     } else {
                         reserves[uint256(idx)] += vaultReserve;
-                        tabAmts[uint256(idx)] += totalOS;
+                        tabAmts[uint256(idx)] += totalOs;
                     }
                     data.totalReserve += v.reserveAmt;
 
                     // Accumulate total tab amount
-                    data.totalTabAmt += totalOS;
+                    data.totalTabAmt += totalOs;
                     if (v.pendingOsMint > 0) {
                         // clear un-minted amount
                         data.tabToMint += v.pendingOsMint;

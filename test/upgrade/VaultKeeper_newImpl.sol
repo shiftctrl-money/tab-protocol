@@ -6,7 +6,7 @@ import {VaultKeeper} from "../../contracts/core/VaultKeeper.sol";
 contract VaultKeeper_newImpl is VaultKeeper {
     string public version;
 
-    function upgraded(string calldata _version) external onlyRole(UPGRADER_ROLE) {
+    function upgraded(string calldata _version) reinitializer(2) external onlyRole(UPGRADER_ROLE) {
         version = _version;
     }
 

@@ -2,15 +2,12 @@
 pragma solidity 0.8.28;
 
 import {console} from "forge-std/console.sol";
-import {Deployer} from "./Deployer.t.sol";
+import {UniDeployer} from "./UniDeployer.t.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {ITransparentUpgradeableProxy} 
-    from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {PriceOracleManager_newImpl} from "./upgrade/PriceOracleManager_newImpl.sol"; 
-import {IGovernanceAction} from "../contracts/interfaces/IGovernanceAction.sol";
 import {IPriceOracleManager} from "../contracts/interfaces/IPriceOracleManager.sol";
 
-contract PriceOracleManagerTest is Deployer {
+contract PriceOracleManagerTest is UniDeployer {
     bytes32 public constant CONFIG_ROLE = keccak256("CONFIG_ROLE");
     bytes32 public constant PAYMENT_ROLE = keccak256("PAYMENT_ROLE");
 
@@ -24,16 +21,20 @@ contract PriceOracleManagerTest is Deployer {
     function setUp() public {
         deploy();
 
-        vm.startPrank(address(governanceTimelockController));
-        governanceAction.addPriceOracleProvider(
+        vm.startPrank(address(zUniGovernance));
+        priceOracleManager.addProvider(
+            block.number,
+            block.timestamp,
             eoa_accounts[7], // provider
             address(ctrl), // paymentTokenAddress
             1e18, // paymentAmtPerFeed
             150, // blockCountPerFeed: every 150 blocks, expect min. 1 feed
             10, // feedSize: provider sends at least 10 currency pairs per feed
-            bytes32(abi.encodePacked("127.0.0.1,192.168.1.1")) // whitelistedIPAddr
+            bytes32(abi.encodePacked("127.0.0.1,192.168.1.1")) // whitelistedIpAddr
         );
-        governanceAction.addPriceOracleProvider(
+        priceOracleManager.addProvider(
+            block.number,
+            block.timestamp,
             eoa_accounts[8],
             address(ctrl),
             1e18,
@@ -41,7 +42,9 @@ contract PriceOracleManagerTest is Deployer {
             10,
             bytes32(abi.encodePacked("123.123.123.123,192.168.100.100"))
         );
-        governanceAction.addPriceOracleProvider(
+        priceOracleManager.addProvider(
+            block.number,
+            block.timestamp,
             eoa_accounts[9],
             address(ctrl),
             1e18,
@@ -68,18 +71,18 @@ contract PriceOracleManagerTest is Deployer {
     }
 
     function test_permission() public {
-        assertEq(priceOracleManager.defaultAdmin() , address(governanceTimelockController));
-        assertEq(priceOracleManager.hasRole(MAINTAINER_ROLE, address(governanceTimelockController)), true);
-        assertEq(priceOracleManager.hasRole(MAINTAINER_ROLE, address(emergencyTimelockController)), true);
-        assertEq(priceOracleManager.hasRole(MAINTAINER_ROLE, address(governanceAction)), true);
+        assertEq(priceOracleManager.defaultAdmin() , address(zUniGovernance));
+        assertEq(priceOracleManager.hasRole(MAINTAINER_ROLE, address(zUniGovernance)), true);
+        // assertEq(priceOracleManager.hasRole(MAINTAINER_ROLE, address(emergencyTimelockController)), true);
+        // assertEq(priceOracleManager.hasRole(MAINTAINER_ROLE, address(governanceAction)), true);
         assertEq(priceOracleManager.hasRole(MAINTAINER_ROLE, oracleProviderPerformanceSignerAddr), true); // _authorizedCaller: tab-oracle 
         
-        assertEq(priceOracleManager.hasRole(CONFIG_ROLE, address(governanceTimelockController)), true);
-        assertEq(priceOracleManager.hasRole(CONFIG_ROLE, address(emergencyTimelockController)), true);
-        assertEq(priceOracleManager.hasRole(CONFIG_ROLE, address(governanceAction)), true);
+        assertEq(priceOracleManager.hasRole(CONFIG_ROLE, address(zUniGovernance)), true);
+        // assertEq(priceOracleManager.hasRole(CONFIG_ROLE, address(emergencyTimelockController)), true);
+        // assertEq(priceOracleManager.hasRole(CONFIG_ROLE, address(governanceAction)), true);
         assertEq(priceOracleManager.hasRole(CONFIG_ROLE, address(tabRegistry)), true);
         
-        assertEq(priceOracleManager.hasRole(UPGRADER_ROLE, address(tabProxyAdmin)), true);
+        assertEq(priceOracleManager.hasRole(UPGRADER_ROLE, address(zUniGovernance)), true);
 
         assertEq(priceOracleManager.getRoleAdmin(PAYMENT_ROLE), MAINTAINER_ROLE);
 
@@ -91,7 +94,7 @@ contract PriceOracleManagerTest is Deployer {
         vm.expectRevert();
         priceOracleManager.beginDefaultAdminTransfer(owner);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         priceOracleManager.beginDefaultAdminTransfer(owner);
         nextBlock(1 days + 1);
         vm.stopPrank();
@@ -107,10 +110,8 @@ contract PriceOracleManagerTest is Deployer {
     }
 
     function test_upgrade() public {
-        assertEq(tabProxyAdmin.owner(), address(governanceTimelockController));
-        vm.startPrank(address(governanceTimelockController));
-        tabProxyAdmin.upgradeAndCall(
-            ITransparentUpgradeableProxy(address(priceOracleManager)), 
+        vm.startPrank(address(zUniGovernance));
+        priceOracleManager.upgradeToAndCall(
             address(new PriceOracleManager_newImpl()),
             abi.encodeWithSignature("upgraded(string)", "upgraded_v2")
         );
@@ -132,7 +133,7 @@ contract PriceOracleManagerTest is Deployer {
         vm.expectRevert(); // unauthorized
         priceOracleManager.setPriceOracle(eoa_accounts[1]);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vm.expectRevert(IPriceOracleManager.ZeroAddress.selector);
         priceOracleManager.setPriceOracle(address(0));
         vm.expectEmit();
@@ -149,7 +150,7 @@ contract PriceOracleManagerTest is Deployer {
         vm.expectRevert(); // unauthorized
         priceOracleManager.setDefBlockGenerationTimeInSecond(sec);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vm.expectRevert(IPriceOracleManager.ZeroValue.selector);
         priceOracleManager.setDefBlockGenerationTimeInSecond(0);
         vm.expectEmit();
@@ -166,7 +167,7 @@ contract PriceOracleManagerTest is Deployer {
         vm.expectRevert(); // unauthorized
         priceOracleManager.updateConfig(value, value);
         
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
 
         vm.expectRevert(IPriceOracleManager.ZeroValue.selector);
         priceOracleManager.updateConfig(0, value);
@@ -191,8 +192,10 @@ contract PriceOracleManagerTest is Deployer {
 
     function test_providerCount() public {
         assertEq(priceOracleManager.providerCount(), 6);
-        vm.startPrank(address(governanceTimelockController));
-        governanceAction.addPriceOracleProvider(
+        vm.startPrank(address(zUniGovernance));
+        priceOracleManager.addProvider(
+            block.number,
+            block.timestamp,
             eoa_accounts[6],
             address(ctrl),
             1e18,
@@ -210,7 +213,7 @@ contract PriceOracleManagerTest is Deployer {
         assertEq(priceOracleManager.activeProvider(eoa_accounts[9]), true);
         assertEq(priceOracleManager.activeProviderCount(), 6);
         
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         priceOracleManager.pauseProvider(eoa_accounts[7]);
         assertEq(priceOracleManager.activeProvider(eoa_accounts[7]), false);
         assertEq(priceOracleManager.activeProviderCount(), 5);
@@ -246,21 +249,21 @@ contract PriceOracleManagerTest is Deployer {
         assertEq(info.paymentAmtPerFeed, 1e18);
         assertEq(info.blockCountPerFeed, 150);
         assertEq(info.feedSize, 10);
-        assertEq(info.whitelistedIPAddr, bytes32(abi.encodePacked("127.0.0.1,192.168.1.1")));
+        assertEq(info.whitelistedIpAddr, bytes32(abi.encodePacked("127.0.0.1,192.168.1.1")));
 
         info = priceOracleManager.getProviderInfo(eoa_accounts[8]);
         assertEq(info.paymentTokenAddress, address(ctrl));
         assertEq(info.paymentAmtPerFeed, 1e18);
         assertEq(info.blockCountPerFeed, 150);
         assertEq(info.feedSize, 10);
-        assertEq(info.whitelistedIPAddr, bytes32(abi.encodePacked("123.123.123.123,192.168.100.100")));
+        assertEq(info.whitelistedIpAddr, bytes32(abi.encodePacked("123.123.123.123,192.168.100.100")));
 
         info = priceOracleManager.getProviderInfo(eoa_accounts[9]);
         assertEq(info.paymentTokenAddress, address(ctrl));
         assertEq(info.paymentAmtPerFeed, 1e18);
         assertEq(info.blockCountPerFeed, 150);
         assertEq(info.feedSize, 10);
-        assertEq(info.whitelistedIPAddr, bytes32(abi.encodePacked("1.2.3.4,5.6.7.8,1.2.3.4,5.6.7.8")));
+        assertEq(info.whitelistedIpAddr, bytes32(abi.encodePacked("1.2.3.4,5.6.7.8,1.2.3.4,5.6.7.8")));
 
         tracker = priceOracleManager.getProviderTracker(eoa_accounts[7]);
         // assertEq(tracker.lastUpdatedTimestamp, 1);
@@ -291,7 +294,7 @@ contract PriceOracleManagerTest is Deployer {
         vm.expectRevert(); // unauthorized
         priceOracleManager.addProvider(value, value, owner, address(ctrl), value, value, value, bytes32(""));
         
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
 
         vm.expectRevert(IPriceOracleManager.ZeroValue.selector);
         priceOracleManager.addProvider(0, value, owner, address(ctrl), value, value, value, bytes32(""));
@@ -337,24 +340,24 @@ contract PriceOracleManagerTest is Deployer {
         require(value > 0 && value < (type(uint256).max - 100));
 
         vm.expectRevert(); // unauthorized
-        governanceAction.configurePriceOracleProvider(eoa_accounts[7], address(this), value, value, value, "123.222.444.555");
+        priceOracleManager.configureProvider(eoa_accounts[7], address(this), value, value, value, "123.222.444.555");
         
         bytes32 ip = bytes32(abi.encodePacked("123.222.444.555"));
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
 
         vm.expectRevert(abi.encodeWithSelector(IPriceOracleManager.InvalidProvider.selector, owner));
-        governanceAction.configurePriceOracleProvider(owner, address(this), value, value, value, ip);
+        priceOracleManager.configureProvider(owner, address(this), value, value, value, ip);
 
         vm.expectRevert(IPriceOracleManager.ZeroAddress.selector);
-        governanceAction.configurePriceOracleProvider(eoa_accounts[7], address(0), value, value, value, ip);
+        priceOracleManager.configureProvider(eoa_accounts[7], address(0), value, value, value, ip);
 
         vm.expectRevert(IPriceOracleManager.ZeroValue.selector);
-        governanceAction.configurePriceOracleProvider(eoa_accounts[7], address(this), 0, value, value, ip);
+        priceOracleManager.configureProvider(eoa_accounts[7], address(this), 0, value, value, ip);
         vm.expectRevert(IPriceOracleManager.ZeroValue.selector);
-        governanceAction.configurePriceOracleProvider(eoa_accounts[7], address(this), value, 0, value, ip);
+        priceOracleManager.configureProvider(eoa_accounts[7], address(this), value, 0, value, ip);
         vm.expectRevert(IPriceOracleManager.ZeroValue.selector);
-        governanceAction.configurePriceOracleProvider(eoa_accounts[7], address(this), value, value, 0, ip);
+        priceOracleManager.configureProvider(eoa_accounts[7], address(this), value, value, 0, ip);
 
         vm.expectEmit();
         emit IPriceOracleManager.ConfigProvider(
@@ -365,7 +368,7 @@ contract PriceOracleManagerTest is Deployer {
             value, 
             ip
         );
-        governanceAction.configurePriceOracleProvider(eoa_accounts[7], address(this), value, value, value, ip);
+        priceOracleManager.configureProvider(eoa_accounts[7], address(this), value, value, value, ip);
 
         provider = priceOracleManager.getProvider(eoa_accounts[7]);
         assertEq(provider.index, 3);
@@ -377,7 +380,7 @@ contract PriceOracleManagerTest is Deployer {
         assertEq(info.paymentAmtPerFeed, value);
         assertEq(info.blockCountPerFeed, value);
         assertEq(info.feedSize, value);
-        assertEq(info.whitelistedIPAddr, ip);
+        assertEq(info.whitelistedIpAddr, ip);
 
         tracker = priceOracleManager.getProviderTracker(eoa_accounts[7]);
         // assertEq(tracker.lastUpdatedTimestamp, 1);
@@ -391,64 +394,58 @@ contract PriceOracleManagerTest is Deployer {
 
     function test_pauseProvider_unpauseProvider() public {
         vm.expectRevert(); // unauthorized
-        governanceAction.pausePriceOracleProvider(eoa_accounts[7]);
+        priceOracleManager.pauseProvider(eoa_accounts[7]);
         vm.expectRevert();
-        governanceAction.unpausePriceOracleProvider(eoa_accounts[7]);
+        priceOracleManager.unpauseProvider(eoa_accounts[7]);
         
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         
         vm.expectRevert(abi.encodeWithSelector(IPriceOracleManager.InvalidProvider.selector, eoa_accounts[6]));
-        governanceAction.pausePriceOracleProvider(eoa_accounts[6]); // provider not existed
+        priceOracleManager.pauseProvider(eoa_accounts[6]); // provider not existed
 
         vm.expectRevert(abi.encodeWithSelector(IPriceOracleManager.InvalidProvider.selector, eoa_accounts[6]));
-        governanceAction.unpausePriceOracleProvider(eoa_accounts[6]); // provider not existed
+        priceOracleManager.unpauseProvider(eoa_accounts[6]); // provider not existed
 
         vm.expectEmit(address(priceOracleManager));
         emit IPriceOracleManager.PausedProvider(eoa_accounts[7]);
-        vm.expectEmit(address(governanceAction));
-        emit IGovernanceAction.PausedPriceOracleProvider(eoa_accounts[7]);
-        governanceAction.pausePriceOracleProvider(eoa_accounts[7]);
+        priceOracleManager.pauseProvider(eoa_accounts[7]);
 
         provider = priceOracleManager.getProvider(eoa_accounts[7]);
         assertEq(provider.paused, true);
 
         vm.expectRevert(abi.encodeWithSelector(IPriceOracleManager.InvalidProvider.selector, eoa_accounts[7]));
-        governanceAction.pausePriceOracleProvider(eoa_accounts[7]); // already paused
+        priceOracleManager.pauseProvider(eoa_accounts[7]); // already paused
 
         vm.expectEmit(address(priceOracleManager));
         emit IPriceOracleManager.UnpausedProvider(eoa_accounts[7]);
-        vm.expectEmit(address(governanceAction));
-        emit IGovernanceAction.UnpausedPriceOracleProvider(eoa_accounts[7]);
-        governanceAction.unpausePriceOracleProvider(eoa_accounts[7]);
+        priceOracleManager.unpauseProvider(eoa_accounts[7]);
 
         provider = priceOracleManager.getProvider(eoa_accounts[7]);
         assertEq(provider.paused, false);
 
         vm.expectRevert(abi.encodeWithSelector(IPriceOracleManager.InvalidProvider.selector, eoa_accounts[7]));
-        governanceAction.unpausePriceOracleProvider(eoa_accounts[7]); // already unpaused
+        priceOracleManager.unpauseProvider(eoa_accounts[7]); // already unpaused
 
         vm.stopPrank();
     }
 
     function test_disableProvider() public {
         vm.expectRevert(); // unauthorized
-        governanceAction.removePriceOracleProvider(eoa_accounts[4], 1, 1); // not existed
+        priceOracleManager.disableProvider(eoa_accounts[4], 1, 1); // not existed
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
 
         vm.expectRevert(IPriceOracleManager.ZeroValue.selector);
-        governanceAction.removePriceOracleProvider(eoa_accounts[7], 0, 1);
+        priceOracleManager.disableProvider(eoa_accounts[7], 0, 1);
         vm.expectRevert(IPriceOracleManager.ZeroValue.selector);
-        governanceAction.removePriceOracleProvider(eoa_accounts[7], 1, 0);
+        priceOracleManager.disableProvider(eoa_accounts[7], 1, 0);
 
         vm.expectRevert();
-        governanceAction.removePriceOracleProvider(eoa_accounts[6], 1, 1); // provider not existed
+        priceOracleManager.disableProvider(eoa_accounts[6], 1, 1); // provider not existed
 
         vm.expectEmit(address(priceOracleManager));
         emit IPriceOracleManager.DisabledProvider(eoa_accounts[7], 1, 1);
-        vm.expectEmit(address(governanceAction));
-        emit IGovernanceAction.RemovedPriceOracleProvider(eoa_accounts[7], 1, 1);
-        governanceAction.removePriceOracleProvider(eoa_accounts[7], 1, 1);
+        priceOracleManager.disableProvider(eoa_accounts[7], 1, 1);
 
         provider = priceOracleManager.getProvider(eoa_accounts[7]);
         // assertEq(provider.disabledOnBlockId, 1);
@@ -458,7 +455,7 @@ contract PriceOracleManagerTest is Deployer {
         assertEq(priceOracleManager.activeProvider(eoa_accounts[7]), false);
 
         vm.expectRevert(abi.encodeWithSelector(IPriceOracleManager.InvalidProvider.selector, eoa_accounts[7]));
-        governanceAction.unpausePriceOracleProvider(eoa_accounts[7]); // already removed
+        priceOracleManager.unpauseProvider(eoa_accounts[7]); // already removed
 
         vm.stopPrank();
     }
@@ -517,8 +514,8 @@ contract PriceOracleManagerTest is Deployer {
         vm.expectRevert(); // unauthorized
         priceOracleManager.withdrawPayment(address(this));
 
-        vm.startPrank(address(governanceTimelockController));
-        governanceAction.removePriceOracleProvider(eoa_accounts[7], block.timestamp, block.timestamp);
+        vm.startPrank(address(zUniGovernance));
+        priceOracleManager.disableProvider(eoa_accounts[7], block.timestamp, block.timestamp);
         vm.stopPrank();
         vm.startPrank(eoa_accounts[7]);
         vm.expectRevert(abi.encodeWithSelector(IPriceOracleManager.InvalidProvider.selector, eoa_accounts[7]));

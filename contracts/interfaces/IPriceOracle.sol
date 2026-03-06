@@ -1,17 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {IPriceData} from "./IUniTabOperation.sol";
+
 interface IPriceOracle {
-    struct UpdatePriceData {
-        address owner;      // signer
-        address updater;    // user (vault owner) address
-        bytes3 tab;
-        uint256 price;
-        uint256 timestamp;
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
     function nonces(address) external view returns (uint256);
     function pause() external;
     function unpause() external;
@@ -19,7 +11,8 @@ interface IPriceOracle {
     function setPeggedTab(bytes3 _ptab, bytes3 _tab, uint256 _priceRatio) external;
     function ctrlAltDel(bytes3 _tab, uint256 fixedPrice) external;
     function setDirectPrice(bytes3 tabCode, uint256 price, uint256 _lastUpdated) external;
-    function updatePrice(UpdatePriceData calldata priceData) external returns (uint256);
+    function updatePrice(IPriceData.UpdatePriceData calldata priceData) external returns (uint256);
+    function validPriceData(IPriceData.UpdatePriceData calldata priceData) external view returns(bool);
     function getPrice(bytes3) external view returns (uint256);
     function getOldPrice(bytes3 _tab) external view returns (uint256);
     

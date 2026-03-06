@@ -2,30 +2,29 @@
 pragma solidity 0.8.28;
 
 import {console} from "forge-std/console.sol";
-import {Deployer} from "./Deployer.t.sol";
+import {UniDeployer} from "./UniDeployer.t.sol";
 import {Dec19BTC} from "./token/Dec19BTC.sol";
 import {Dec18BTC} from "./token/Dec18BTC.sol";
 import {IReserveRegistry} from "../contracts/interfaces/IReserveRegistry.sol";
-import {IGovernanceAction} from "../contracts/interfaces/IGovernanceAction.sol";
 import {IVaultManager} from "../contracts/interfaces/IVaultManager.sol";
 
-contract ReserveRegistryTest is Deployer {
+contract ReserveRegistryTest is UniDeployer {
 
     function setUp() public {
         deploy();
     }
 
     function test_permission() public {
-        assertEq(reserveRegistry.defaultAdmin() , address(governanceTimelockController));
-        assertEq(reserveRegistry.hasRole(MAINTAINER_ROLE, address(governanceTimelockController)), true);
-        assertEq(reserveRegistry.hasRole(MAINTAINER_ROLE, address(emergencyTimelockController)), true);
-        assertEq(reserveRegistry.hasRole(MAINTAINER_ROLE, address(governanceAction)), true);
+        assertEq(reserveRegistry.defaultAdmin() , address(zUniGovernance));
+        assertEq(reserveRegistry.hasRole(MAINTAINER_ROLE, address(zUniGovernance)), true);
+        // assertEq(reserveRegistry.hasRole(MAINTAINER_ROLE, address(emergencyTimelockController)), true);
+        // assertEq(reserveRegistry.hasRole(MAINTAINER_ROLE, address(governanceAction)), true);
         assertEq(reserveRegistry.hasRole(MAINTAINER_ROLE, owner), false);
 
         vm.expectRevert();
         reserveRegistry.beginDefaultAdminTransfer(owner);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         reserveRegistry.beginDefaultAdminTransfer(owner);
         nextBlock(1 days + 1);
         vm.stopPrank();
@@ -40,7 +39,7 @@ contract ReserveRegistryTest is Deployer {
         vm.expectRevert();
         reserveRegistry.updateReserveSafe(address(reserveSafe)); // unauthorized
 
-        vm.startPrank(address(governanceAction));
+        vm.startPrank(address(zUniGovernance));
 
         vm.expectRevert(IReserveRegistry.ZeroAddress.selector);
         reserveRegistry.updateReserveSafe(address(0));
@@ -62,17 +61,15 @@ contract ReserveRegistryTest is Deployer {
 
         vm.startPrank(owner); // unauthorized
         vm.expectRevert();
-        governanceAction.addReserve(address(anotherSupportedBTCToken), address(reserveSafe));
-        vm.expectRevert();
         reserveRegistry.addReserve(address(anotherSupportedBTCToken), address(reserveSafe));
         vm.stopPrank();
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         
         vm.expectRevert(IReserveRegistry.ZeroAddress.selector);
-        governanceAction.addReserve(address(0), address(reserveSafe));
+        reserveRegistry.addReserve(address(0), address(reserveSafe));
         vm.expectRevert(IReserveRegistry.ZeroAddress.selector);
-        governanceAction.addReserve(address(anotherSupportedBTCToken), address(0));
+        reserveRegistry.addReserve(address(anotherSupportedBTCToken), address(0));
 
         vm.expectRevert(IReserveRegistry.InvalidReserveSafe.selector);
         reserveRegistry.addReserve(address(anotherSupportedBTCToken), eoa_accounts[1]);
@@ -90,9 +87,7 @@ contract ReserveRegistryTest is Deployer {
 
         vm.expectEmit(address(reserveRegistry));
         emit IReserveRegistry.AddedReserve(address(anotherSupportedBTCToken), address(reserveSafe), 18);
-        vm.expectEmit(address(governanceAction));
-        emit IGovernanceAction.AddedReserve(address(anotherSupportedBTCToken), address(reserveSafe));
-        governanceAction.addReserve(address(anotherSupportedBTCToken), address(reserveSafe));
+        reserveRegistry.addReserve(address(anotherSupportedBTCToken), address(reserveSafe));
 
         vm.stopPrank();
 
@@ -106,8 +101,6 @@ contract ReserveRegistryTest is Deployer {
     function test_disableReserve() public {
         vm.startPrank(owner); // unauthorized
         vm.expectRevert();
-        governanceAction.disableReserve(address(cbBTC));
-        vm.expectRevert();
         reserveRegistry.removeReserve(address(cbBTC));
         vm.stopPrank();
 
@@ -118,22 +111,20 @@ contract ReserveRegistryTest is Deployer {
         priceData = signer.getUpdatePriceSignature(sUSD, 60000e18, block.timestamp); 
         vaultManager.createVault(address(cbBTC), 1e18, 10000e18, priceData);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
 
         vm.expectRevert(IReserveRegistry.InvalidReserveToken.selector);
-        governanceAction.disableReserve(address(0));
+        reserveRegistry.removeReserve(address(0));
 
         assertEq(reserveRegistry.enabledReserve(address(cbBTC)), true);
         assertEq(reserveRegistry.isEnabledReserve(address(cbBTC)), address(reserveSafe));
 
         vm.expectEmit(address(reserveRegistry));
         emit IReserveRegistry.RemovedReserve(address(cbBTC));
-        vm.expectEmit(address(governanceAction));
-        emit IGovernanceAction.RemovedReserve(address(cbBTC));
-        governanceAction.disableReserve(address(cbBTC));
+        reserveRegistry.removeReserve(address(cbBTC));
 
         vm.expectRevert(IReserveRegistry.InvalidReserveToken.selector);
-        governanceAction.disableReserve(address(cbBTC)); // already disabled
+        reserveRegistry.removeReserve(address(cbBTC)); // already disabled
 
         assertEq(reserveRegistry.enabledReserve(address(cbBTC)), false);
         assertEq(reserveRegistry.isEnabledReserve(address(cbBTC)), address(0));
@@ -145,7 +136,7 @@ contract ReserveRegistryTest is Deployer {
         vaultManager.createVault(address(cbBTC), 1e18, 10000e18, priceData);
 
         vm.expectRevert(abi.encodeWithSelector(IVaultManager.InvalidReserve.selector, address(cbBTC)));
-        vaultManager.withdrawReserve(1, 1e6, priceData);
+        vaultManager.withdrawReserve(1, 1e6, msg.sender, priceData);
 
         vm.expectRevert(abi.encodeWithSelector(IVaultManager.InvalidReserve.selector, address(cbBTC)));
         vaultManager.depositReserve(deployer, 1, 1e6);

@@ -2,10 +2,10 @@
 pragma solidity 0.8.28;
 
 import {console} from "forge-std/console.sol";
-import {Deployer} from "./Deployer.t.sol";
+import {UniDeployer} from "./UniDeployer.t.sol";
 import {IReserveSafe} from "../contracts/interfaces/IReserveSafe.sol";
 
-contract ReserveSafeTest is Deployer {
+contract ReserveSafeTest is UniDeployer {
     bytes32 public constant UNLOCKER_ROLE = keccak256("UNLOCKER_ROLE");
     bytes32 public constant RESERVE_REGISTRY_ROLE = keccak256("RESERVE_REGISTRY_ROLE");
 
@@ -14,17 +14,17 @@ contract ReserveSafeTest is Deployer {
     }
 
     function test_permission() public {
-        assertEq(reserveSafe.defaultAdmin() , address(governanceTimelockController));
-        assertEq(reserveSafe.hasRole(UNLOCKER_ROLE, address(governanceTimelockController)), true);
-        assertEq(reserveSafe.hasRole(UNLOCKER_ROLE, address(emergencyTimelockController)), true);
+        assertEq(reserveSafe.defaultAdmin() , address(zUniGovernance));
+        assertEq(reserveSafe.hasRole(UNLOCKER_ROLE, address(zUniGovernance)), true);
+        // assertEq(reserveSafe.hasRole(UNLOCKER_ROLE, address(emergencyTimelockController)), true);
         assertEq(reserveSafe.hasRole(UNLOCKER_ROLE, address(vaultManager)), true);
-        assertEq(reserveSafe.hasRole(RESERVE_REGISTRY_ROLE, address(governanceTimelockController)), true);
+        assertEq(reserveSafe.hasRole(RESERVE_REGISTRY_ROLE, address(zUniGovernance)), true);
         assertEq(reserveSafe.hasRole(RESERVE_REGISTRY_ROLE, address(reserveRegistry)), true);
 
         vm.expectRevert();
         reserveSafe.beginDefaultAdminTransfer(owner);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         reserveSafe.beginDefaultAdminTransfer(owner);
         nextBlock(1 days + 1);
         vm.stopPrank();
@@ -98,7 +98,7 @@ contract ReserveSafeTest is Deployer {
         vm.expectRevert();
         reserveSafe.approveSpendFromSafe(address(cbBTC), owner, trfAmt);
 
-        vm.startPrank(address(emergencyTimelockController));
+        vm.startPrank(address(zUniGovernance));
         vm.expectEmit();
         emit IReserveSafe.ApprovedSpender(owner, trfAmt);
         reserveSafe.approveSpendFromSafe(address(cbBTC), owner, amt);

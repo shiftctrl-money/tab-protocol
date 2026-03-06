@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IPriceOracle} from "./IPriceOracle.sol";
+import {IPriceData} from "./IUniTabOperation.sol";
 
 interface IVaultManager {
     struct Vault {
+        uint256 chainID; // vault owner is bound to vault creation chain id
         address reserveAddr; // locked reserve address
         uint256 reserveAmt; // BTC quantity in 18 decimals
         address tab; // minted tab currency
@@ -49,14 +50,16 @@ interface IVaultManager {
         address _reserveAddr, 
         uint256 _reserveAmt, 
         uint256 _tabAmt, 
-        IPriceOracle.UpdatePriceData calldata sigPrice
+        IPriceData.UpdatePriceData calldata sigPrice
     ) 
-        external;
+        external 
+        returns(address);
 
     function withdrawTab(
         uint256 _vaultId, 
         uint256 _tabAmt, 
-        IPriceOracle.UpdatePriceData calldata sigPrice
+        address _receiver,
+        IPriceData.UpdatePriceData calldata sigPrice
     ) 
         external;
 
@@ -70,7 +73,8 @@ interface IVaultManager {
     function withdrawReserve(
         uint256 _vaultId, 
         uint256 _reserveAmt, 
-        IPriceOracle.UpdatePriceData calldata sigPrice
+        address _receiver,
+        IPriceData.UpdatePriceData calldata sigPrice
     ) 
         external;
 
@@ -91,7 +95,7 @@ interface IVaultManager {
     function liquidateVault(
         uint256 _vaultId,
         uint256 _osRiskPenalty,
-        IPriceOracle.UpdatePriceData calldata sigPrice
+        IPriceData.UpdatePriceData calldata sigPrice
     )
         external;
         
@@ -122,6 +126,7 @@ interface IVaultManager {
     event TabWithdraw(
         address indexed vaultOwner, 
         uint256 indexed id, 
+        address indexed receiver,
         uint256 withdrawAmt, 
         uint256 newAmt
     );
@@ -133,6 +138,7 @@ interface IVaultManager {
     );
     event ReserveWithdraw(
         address indexed vaultOwner, 
+        address indexed receiver,
         uint256 indexed id, 
         uint256 withdrawAmt, 
         uint256 newAmt

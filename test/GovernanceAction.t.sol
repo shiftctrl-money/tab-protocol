@@ -2,9 +2,7 @@
 pragma solidity 0.8.28;
 
 import {console} from "forge-std/console.sol";
-import {Deployer} from "./Deployer.t.sol";
-import {ITransparentUpgradeableProxy} 
-    from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {UniDeployer} from "./UniDeployer.t.sol";
 import {TabERC20} from "../contracts/token/TabERC20.sol";
 import {CBBTC} from "../contracts/token/CBBTC.sol";
 import {GovernanceAction_newImpl} from "./upgrade/GovernanceAction_newImpl.sol";
@@ -12,7 +10,7 @@ import {IConfig} from "../contracts/interfaces/IConfig.sol";
 import {IGovernanceAction} from "../contracts/interfaces/IGovernanceAction.sol";
 import {IPriceOracleManager} from "../contracts/interfaces/IPriceOracleManager.sol";
 
-contract GovernanceActionTest is Deployer {
+contract GovernanceActionTest is UniDeployer {
     IPriceOracleManager.OracleProvider provider;
     IPriceOracleManager.Info info;
 
@@ -25,7 +23,7 @@ contract GovernanceActionTest is Deployer {
         assertEq(governanceAction.hasRole(MAINTAINER_ROLE, address(governanceTimelockController)), true);
         assertEq(governanceAction.hasRole(MAINTAINER_ROLE, address(emergencyTimelockController)), true);
         assertEq(governanceAction.hasRole(MAINTAINER_ROLE, owner), false);
-        assertEq(governanceAction.hasRole(UPGRADER_ROLE, address(tabProxyAdmin)), true);
+        assertEq(governanceAction.hasRole(UPGRADER_ROLE, owner), true);
         
         vm.expectRevert();
         governanceAction.beginDefaultAdminTransfer(owner);
@@ -42,10 +40,8 @@ contract GovernanceActionTest is Deployer {
     }
 
     function test_upgrade() public {
-        assertEq(tabProxyAdmin.owner(), address(governanceTimelockController));
-        vm.startPrank(address(governanceTimelockController));
-        tabProxyAdmin.upgradeAndCall(
-            ITransparentUpgradeableProxy(address(governanceAction)), 
+        vm.startPrank(owner);
+        governanceAction.upgradeToAndCall(
             address(new GovernanceAction_newImpl()),
             abi.encodeWithSignature("upgraded(string)", "governanceAction_v2")
         );
@@ -214,13 +210,16 @@ contract GovernanceActionTest is Deployer {
         governanceAction.createNewTab(usd);
         governanceAction.createNewTab(peg);
 
+        vm.startPrank(address(zUniGovernance));
         priceOracle.setDirectPrice(usd, 60000e18, block.timestamp);
+        
+        vm.startPrank(address(governanceTimelockController));
         governanceAction.setPeggedTab(peg, usd, 100);
 
         vm.stopPrank();
 
-        assertEq(tabRegistry.activatedTabCount(), 2);
-        assertEq(keccak256(abi.encodePacked(peg)), keccak256(abi.encodePacked(tabRegistry.tabList(1))));
+        assertEq(tabRegistry.activatedTabCount(), 4);
+        assertEq(keccak256(abi.encodePacked(peg)), keccak256(abi.encodePacked(tabRegistry.tabList(3))));
         assertEq(tabRegistry.peggedTabCount(), 1);
         assertEq(keccak256(abi.encodePacked(peg)), keccak256(abi.encodePacked(tabRegistry.peggedTabList(0))));
         assertEq(tabRegistry.peggedTabMap(pegKey), usdKey);
@@ -248,7 +247,7 @@ contract GovernanceActionTest is Deployer {
     }
 
     function test_addReserve_disableReserve() public {
-        CBBTC newReserve = new CBBTC(owner);
+        CBBTC newReserve = new CBBTC(owner, "TestCBBTC", "CBBTC");
         assertEq(reserveSafe.reserveDecimal(address(newReserve)), 0);
 
         vm.expectRevert(); // unauthorized
@@ -298,7 +297,7 @@ contract GovernanceActionTest is Deployer {
         assertEq(info.paymentAmtPerFeed, 1e18);
         assertEq(info.blockCountPerFeed, 100);
         assertEq(info.feedSize, 100);
-        assertEq(info.whitelistedIPAddr, bytes32(""));
+        assertEq(info.whitelistedIpAddr, bytes32(""));
 
         vm.expectEmit();
         emit IGovernanceAction.ConfigPriceOracleProvider(
@@ -317,7 +316,7 @@ contract GovernanceActionTest is Deployer {
         assertEq(info.paymentAmtPerFeed, 8e18);
         assertEq(info.blockCountPerFeed, 99);
         assertEq(info.feedSize, 98);
-        assertEq(info.whitelistedIPAddr, bytes32("192.168.1.1"));
+        assertEq(info.whitelistedIpAddr, bytes32("192.168.1.1"));
 
         vm.expectEmit();
         emit IGovernanceAction.RemovedPriceOracleProvider(eoa_accounts[7], block.number, block.timestamp);

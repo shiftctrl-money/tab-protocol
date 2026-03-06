@@ -110,8 +110,10 @@ contract ReserveSafe is IReserveSafe, AccessControlDefaultAdminRules {
     {
         if (reserveDecimal[reserveAddr] == 18)
             return value;
-        else
-            return value / (10 ** (18 - reserveDecimal[reserveAddr]));
+        else {
+            uint256 scaleUp = (10 ** (18 - reserveDecimal[reserveAddr])); // 10000000000
+            return value / scaleUp;
+        }
     }
 
 }

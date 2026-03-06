@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IPriceOracle} from "./IPriceOracle.sol";
+import {IPriceData} from "./IUniTabOperation.sol";
 import {IConfig} from "./IConfig.sol";
 
 interface IVaultKeeper {
@@ -25,7 +25,7 @@ interface IVaultKeeper {
         address owner;
         uint256 vaultId;
         uint256 delta;
-        uint256 chargedRP;
+        uint256 chargedRp;
     }
 
     function vaultManager() external view returns (address);
@@ -55,7 +55,7 @@ interface IVaultKeeper {
     function checkVault(
         uint256 _timestamp, 
         VaultDetails calldata v, 
-        IPriceOracle.UpdatePriceData calldata sigPrice
+        IPriceData.UpdatePriceData calldata sigPrice
     ) 
         external;
     function pushVaultRiskPenalty(address _vaultOwner, uint256 _vaultId) external;
@@ -63,7 +63,7 @@ interface IVaultKeeper {
     function isLiquidatingVault(
         bytes3 _tab,
         uint256 _totalReserve,
-        uint256 _totalOS
+        uint256 _totalOs
     )
         external
         view

@@ -2,14 +2,14 @@
 pragma solidity 0.8.28;
 
 import {console} from "forge-std/console.sol";
-import {Deployer} from "./Deployer.t.sol";
+import {UniDeployer} from "./UniDeployer.t.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {IPriceOracle} from "../contracts/interfaces/IPriceOracle.sol";
 
-contract PriceOracleTest is Deployer {
+contract PriceOracleTest is UniDeployer {
 
     bytes32 public constant FEEDER_ROLE = keccak256("FEEDER_ROLE");
     bytes32 public constant SIGNER_ROLE = keccak256("SIGNER_ROLE");
@@ -22,25 +22,25 @@ contract PriceOracleTest is Deployer {
     }
 
     function test_permission() public {
-        assertEq(priceOracle.defaultAdmin() , address(governanceTimelockController));
-        assertEq(priceOracle.hasRole(FEEDER_ROLE, address(governanceTimelockController)), true);
-        assertEq(priceOracle.hasRole(FEEDER_ROLE, address(emergencyTimelockController)), true);
+        assertEq(priceOracle.defaultAdmin() , address(zUniGovernance));
+        assertEq(priceOracle.hasRole(FEEDER_ROLE, address(zUniGovernance)), true);
+        // assertEq(priceOracle.hasRole(FEEDER_ROLE, address(emergencyTimelockController)), true);
         assertEq(priceOracle.hasRole(FEEDER_ROLE, address(vaultManager)), true);
         assertEq(priceOracle.hasRole(SIGNER_ROLE, oracleRelayerSignerAddr), true);
-        assertEq(priceOracle.hasRole(PAUSER_ROLE, address(governanceTimelockController)), true);
-        assertEq(priceOracle.hasRole(PAUSER_ROLE, address(emergencyTimelockController)), true);
-        assertEq(priceOracle.hasRole(PRICE_ORACLE_MANAGER_ROLE, address(governanceTimelockController)), true);
-        assertEq(priceOracle.hasRole(PRICE_ORACLE_MANAGER_ROLE, address(emergencyTimelockController)), true);
+        assertEq(priceOracle.hasRole(PAUSER_ROLE, address(zUniGovernance)), true);
+        // assertEq(priceOracle.hasRole(PAUSER_ROLE, address(emergencyTimelockController)), true);
+        assertEq(priceOracle.hasRole(PRICE_ORACLE_MANAGER_ROLE, address(zUniGovernance)), true);
+        // assertEq(priceOracle.hasRole(PRICE_ORACLE_MANAGER_ROLE, address(emergencyTimelockController)), true);
         assertEq(priceOracle.hasRole(PRICE_ORACLE_MANAGER_ROLE, address(priceOracleManager)), true);
-        assertEq(priceOracle.hasRole(TAB_REGISTRY_ROLE, address(governanceTimelockController)), true);
-        assertEq(priceOracle.hasRole(TAB_REGISTRY_ROLE, address(emergencyTimelockController)), true);
+        assertEq(priceOracle.hasRole(TAB_REGISTRY_ROLE, address(zUniGovernance)), true);
+        // assertEq(priceOracle.hasRole(TAB_REGISTRY_ROLE, address(emergencyTimelockController)), true);
         assertEq(priceOracle.hasRole(TAB_REGISTRY_ROLE, address(tabRegistry)), true);
         assertEq(priceOracle.inactivePeriod(), 1 hours);
 
         vm.expectRevert();
         priceOracle.beginDefaultAdminTransfer(owner);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         priceOracle.beginDefaultAdminTransfer(owner);
         nextBlock(1 days + 1);
         vm.stopPrank();
@@ -81,11 +81,11 @@ contract PriceOracleTest is Deployer {
         );
         bytes3 usd = bytes3(abi.encodePacked("USD"));
 
-        vm.startPrank(address(governanceTimelockController));
-        governanceAction.createNewTab(usd);
+        vm.startPrank(address(zUniGovernance));
+        tabRegistry.createTab(usd);
         vm.stopPrank();
 
-        vm.startPrank(address(emergencyTimelockController));
+        vm.startPrank(address(zUniGovernance));
         priceOracle.setDirectPrice(usd, _price, block.timestamp);
         vm.stopPrank();
 
@@ -109,8 +109,8 @@ contract PriceOracleTest is Deployer {
 
     function test_ctrlAltDel() public {
         bytes3 sUSD = bytes3(abi.encodePacked("USD"));
-        vm.startPrank(address(governanceTimelockController));
-        governanceAction.createNewTab(sUSD);
+        vm.startPrank(address(zUniGovernance));
+        tabRegistry.createTab(sUSD);
         vm.stopPrank();
 
         uint256[] memory deposits = new uint256[](10);
@@ -137,9 +137,9 @@ contract PriceOracleTest is Deployer {
         assertEq(cbBTC.balanceOf(address(reserveSafe)), reserveSafe.getNativeTransferAmount(address(cbBTC), depositSum));
         assertEq(IERC20(sUSDAddr).balanceOf(deployer), 100e18 * 10);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         
-        governanceAction.ctrlAltDel(sUSD, 110000e18);
+        tabRegistry.ctrlAltDel(sUSD, 110000e18);
         assertEq(priceOracle.ctrlAltDelTab(sUSD), 110000e18);
         assertEq(priceOracle.getPrice(sUSD), 110000e18);
         assertEq(priceOracle.getOldPrice(sUSD), 110000e18);
@@ -160,13 +160,13 @@ contract PriceOracleTest is Deployer {
 
         vm.startPrank(eoa_accounts[1]);
         cbBTC.approve(address(protocolVault), 1e8);
-        protocolVault.buyTab(address(cbBTC), sUSDAddr, 1e18);
+        protocolVault.buyTab(address(cbBTC), 1e18, sUSDAddr, eoa_accounts[1]);
         assertEq(IERC20(sUSDAddr).balanceOf(eoa_accounts[1]), 110000e18);
         vm.stopPrank();
 
         vm.startPrank(deployer);
         IERC20(sUSDAddr).approve(address(protocolVault), 100e18);
-        protocolVault.sellTab(address(cbBTC), sUSDAddr, 100e18);
+        protocolVault.sellTab(address(cbBTC), sUSDAddr, 100e18, deployer);
         assertEq(IERC20(sUSDAddr).balanceOf(deployer), 100e18 * 9);
     }
 
@@ -177,7 +177,7 @@ contract PriceOracleTest is Deployer {
         vm.assume(price > 0 && price < type(uint256).max);
         require(price > 0 && price < type(uint256).max);
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         priceOracle.pause();
         vm.expectRevert(Pausable.EnforcedPause.selector);
         priceOracle.setDirectPrice(usd, price, block.timestamp);
@@ -187,7 +187,7 @@ contract PriceOracleTest is Deployer {
         vm.expectRevert(); // unauthorized
         priceOracle.setDirectPrice(usd, price, block.timestamp);
 
-        vm.startPrank(address(emergencyTimelockController));
+        vm.startPrank(address(zUniGovernance));
 
         vm.expectRevert(IPriceOracle.ZeroPrice.selector);
         priceOracle.setDirectPrice(usd, 0, block.timestamp);
@@ -227,7 +227,7 @@ contract PriceOracleTest is Deployer {
         bytes3 sUSD = bytes3(abi.encodePacked("USD"));
         priceData = signer.getUpdatePriceSignature(sUSD, 100000e18, block.timestamp); 
 
-        vm.startPrank(address(governanceTimelockController));
+        vm.startPrank(address(zUniGovernance));
         priceOracle.pause();
         vm.expectRevert(Pausable.EnforcedPause.selector);
         priceOracle.updatePrice(priceData);

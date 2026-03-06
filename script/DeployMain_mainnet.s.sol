@@ -111,7 +111,7 @@ contract DeployMainnet is Script {
 
         // CBBTC: reserve token
         if (cbBTCAddr == address(0)) { // testnet: deploy simulated CBBTC so protocol can mint reserve tokens
-            cbBTC = new CBBTC(owner);
+            cbBTC = new CBBTC(owner, "TestCBBTC", "CBBTC");
             cbBTCAddr = address(cbBTC);
             console.log("CBBTC deployed at:", cbBTCAddr);
         } else { // mainnet
@@ -208,7 +208,7 @@ contract DeployMainnet is Script {
         console.log("tabRegistry: ", address(tabRegistry));
 
         tabFactory = TabFactory(tabFactoryAddr); 
-        tabFactory.updateTabRegistry(address(tabRegistry));
+        tabFactory.updateCreator(address(tabRegistry));
         console.log("tabFactory: ", address(tabFactory));
         
         tabRegistry.setTabFactory(address(tabFactory));
@@ -353,7 +353,7 @@ contract DeployMainnet is Script {
             1e16,       // paymentAmtPerFeed: 0.01 CTRL for each feed
             150,        // blockCountPerFeed
             10,         // feedSize: minimum number of currency pairs sent by provider
-            bytes32(0)  // whitelistedIPAddr: allow sending from any IP
+            bytes32(0)  // whitelistedIpAddr: allow sending from any IP
         );
         governanceAction.addPriceOracleProvider(
             0xE728C3436836d980AeCd7DcB2935dc808c2E5a5f, // provider
@@ -361,7 +361,7 @@ contract DeployMainnet is Script {
             1e16,       // paymentAmtPerFeed: 0.01 CTRL for each feed
             150,        // blockCountPerFeed
             10,         // feedSize: minimum number of currency pairs sent by provider
-            bytes32(0)  // whitelistedIPAddr: allow sending from any IP
+            bytes32(0)  // whitelistedIpAddr: allow sending from any IP
         );
         governanceAction.addPriceOracleProvider(
             0x6EeA49a87c6e46c8EC6C74C9870717eFF8616C3B, // provider
@@ -369,7 +369,7 @@ contract DeployMainnet is Script {
             1e16,       // paymentAmtPerFeed: 0.01 CTRL for each feed
             150,        // blockCountPerFeed
             10,         // feedSize: minimum number of currency pairs sent by provider
-            bytes32(0)  // whitelistedIPAddr: allow sending from any IP
+            bytes32(0)  // whitelistedIpAddr: allow sending from any IP
         );
 /*
         // Default CTRL allocation to support governance and AirDrop campaigns
